@@ -20,7 +20,7 @@ export interface Slide {
 
 export interface CarouselConfig {
   title: string
-  platform: 'instagram' | 'linkedin'
+  platform: 'instagram' | 'linkedin' | 'tiktok'
   slides: Slide[]
 }
 
