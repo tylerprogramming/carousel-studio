@@ -257,6 +257,10 @@ app.post('/api/generate-bg-image', async (c) => {
   const refs: string[] = [...referenceImages]
   if (useLikeness && settings.likenessPath && existsSync(settings.likenessPath)) refs.unshift(settings.likenessPath)
 
+  // When using likeness, append person description to prompt so the model generates the right gender/look
+  const likenessHint = useLikeness && settings.likenessDescription ? ` ${settings.likenessDescription}` : ''
+  const finalPrompt = prompt ? `${prompt}${likenessHint}` : prompt
+
   if (!process.env.KIE_API_KEY) {
     return c.json({ error: 'KIE_API_KEY not set in ~/.claude/.env' }, 400)
   }
@@ -272,7 +276,7 @@ app.post('/api/generate-bg-image', async (c) => {
         if (scope === 'each' && slides.length > 0) {
           // Generate one image per slide using auto-prompts from slide content
           for (const slide of slides) {
-            const autoPrompt = buildAutoPrompt(slide, prompt)
+            const autoPrompt = buildAutoPrompt(slide, finalPrompt)
             const filename   = `${outputPrefix}_slide${slide.slideNumber}.png`
             const outputPath = join(OUTPUT_DIR, filename)
             const payload    = JSON.stringify({ prompt: autoPrompt, output: outputPath, referenceImages: refs })
@@ -292,10 +296,10 @@ app.post('/api/generate-bg-image', async (c) => {
 
         } else {
           // Single or All: one image
-          if (!prompt?.trim()) { send({ type: 'error', message: 'prompt is required' }); controller.close(); return }
+          if (!finalPrompt?.trim()) { send({ type: 'error', message: 'prompt is required' }); controller.close(); return }
           const filename   = `${outputPrefix}.png`
           const outputPath = join(OUTPUT_DIR, filename)
-          const payload    = JSON.stringify({ prompt, output: outputPath, referenceImages: refs })
+          const payload    = JSON.stringify({ prompt: finalPrompt, output: outputPath, referenceImages: refs })
 
           send({ type: 'progress', message: 'Generating background image...' })
 

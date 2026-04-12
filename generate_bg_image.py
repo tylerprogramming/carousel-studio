@@ -54,7 +54,8 @@ def upload_reference_image(path, api_key):
             capture_output=True, text=True, timeout=30,
         )
         data = json.loads(result.stdout)
-        return data.get("data", {}).get("url") or data.get("url")
+        # Kie.ai returns the URL in "downloadUrl" field
+        return data.get("data", {}).get("downloadUrl") or data.get("data", {}).get("url") or data.get("url")
     finally:
         os.unlink(tmp_path)
 
@@ -66,8 +67,11 @@ def create_task(prompt, api_key, reference_images=None):
             if url:
                 image_input.append(url)
                 print(f"  Reference uploaded: {Path(path).name}", flush=True)
+    # Use nano-banana-pro when reference images are provided — better likeness fidelity
+    model = "nano-banana-pro" if image_input else "nano-banana-2"
+    print(f"  Model: {model}", flush=True)
     payload = {
-        "model": "nano-banana-2",
+        "model": model,
         "input": {
             "prompt":        prompt,
             "image_input":   image_input,
@@ -83,23 +87,39 @@ def create_task(prompt, api_key, reference_images=None):
         raise RuntimeError(f"No taskId in response: {resp}")
     return task_id
 
-def poll(task_id, api_key, max_wait=120, interval=3):
+def poll(task_id, api_key, max_wait=360, interval=4):
     url   = f"{POLL_URL}?taskId={task_id}"
     start = time.time()
+    last_state = None
     while time.time() - start < max_wait:
-        resp  = api_get(url, api_key)
+        try:
+            resp  = api_get(url, api_key)
+        except Exception as e:
+            print(f"  Poll error: {e} — retrying...", flush=True)
+            time.sleep(interval)
+            continue
         data  = resp.get("data", {})
         state = data.get("state", "")
-        if state == "success":
+        if state != last_state:
+            print(f"  State: {state}", flush=True)
+            last_state = state
+        # Accept both "success" and "completed" in case API varies
+        if state in ("success", "completed", "done"):
             result = data.get("resultJson", "{}")
             if isinstance(result, str):
-                result = json.loads(result)
+                try:
+                    result = json.loads(result)
+                except Exception:
+                    result = {}
             urls = result.get("resultUrls", [])
+            if not urls:
+                # Some responses nest differently
+                urls = result.get("images", []) or result.get("urls", [])
             return urls[0] if urls else None
-        elif state == "fail":
-            raise RuntimeError(f"Generation failed: {data.get('failMsg')}")
+        elif state in ("fail", "failed", "error"):
+            raise RuntimeError(f"Generation failed: {data.get('failMsg') or data.get('message', 'unknown error')}")
         time.sleep(interval)
-    raise RuntimeError(f"Timed out after {max_wait}s")
+    raise RuntimeError(f"Timed out after {max_wait}s waiting for task {task_id}")
 
 def download(url, output_path):
     headers = {"User-Agent": "Mozilla/5.0", "Accept": "image/*,*/*"}
