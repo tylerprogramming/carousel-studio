@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+client/node_modules/
+
+# Build output
+client/dist/
+
+# Generated files (user-specific, not part of the repo)
+output/
+carousels/
+settings.json
+
+# Environment & secrets
+.env
+.env.local
+*.env
+
+# macOS
+.DS_Store
+
+# Bun
+bun.lockb
