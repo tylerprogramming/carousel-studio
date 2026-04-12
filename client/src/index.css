@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* shadcn/ui HSL tokens — warm stone palette */
+    --background:           30 20% 98%;
+    --foreground:           20 14% 4%;
+    --card:                 0 0% 100%;
+    --card-foreground:      20 14% 4%;
+    --popover:              0 0% 100%;
+    --popover-foreground:   20 14% 4%;
+    --primary:              16 65% 61%;
+    --primary-foreground:   0 0% 98%;
+    --secondary:            30 6% 94%;
+    --secondary-foreground: 20 14% 4%;
+    --muted:                30 6% 94%;
+    --muted-foreground:     25 5% 45%;
+    --accent:               30 6% 94%;
+    --accent-foreground:    20 14% 4%;
+    --destructive:          0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border:               24 6% 88%;
+    --input:                24 6% 88%;
+    --ring:                 16 65% 61%;
+    --radius:               0.5rem;
+
+    /* Named tokens for components not yet on Tailwind */
+    --bg:           hsl(30 20% 98%);
+    --panel:        hsl(0 0% 100%);
+    --border-col:   hsl(24 6% 88%);
+    --border-dark:  hsl(24 6% 80%);
+    --text:         hsl(20 14% 4%);
+    --text-muted:   hsl(25 5% 45%);
+    --text-xmuted:  hsl(24 5% 60%);
+    --card-bg:      hsl(30 6% 97%);
+    --accent-col:   hsl(16 65% 61%);
+    --accent-light: hsl(16 65% 97%);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ── Scrollbars ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: hsl(24 6% 80%); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(24 5% 60%); }
+
+/* ── Form elements ──────────────────────────────────────────────────────────── */
+textarea, input { font-family: 'Inter', system-ui, sans-serif; }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: hsl(24 6% 80%);
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  cursor: pointer;
+  box-shadow: 0 0 0 2px hsl(0 0% 100%), 0 0 0 4px hsl(var(--primary) / 0.2);
+  transition: box-shadow 0.15s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 2px hsl(0 0% 100%), 0 0 0 5px hsl(var(--primary) / 0.35);
+}
+
+/* ── Animations ─────────────────────────────────────────────────────────────── */
+@keyframes spin    { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+@keyframes fadeIn  { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes slideIn { from { opacity: 0; transform: translateX(16px) } to { opacity: 1; transform: translateX(0) } }
+@keyframes pulse   { 0%, 100% { opacity: 1 } 50% { opacity: 0.5 } }
+
+.animate-fade-in  { animation: fadeIn 0.2s ease-out; }
+.animate-slide-in { animation: slideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-spin-slow { animation: spin 1s linear infinite; }
+.animate-pulse-soft { animation: pulse 2s ease-in-out infinite; }
