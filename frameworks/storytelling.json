@@ -1,0 +1,17 @@
+{
+  "id": "storytelling",
+  "name": "Storytelling",
+  "emoji": "📖",
+  "description": "Hook → Context → Conflict → Turn → Lesson → Application → CTA — narrative arc",
+  "slideCount": 7,
+  "systemPrompt": "You write story-driven carousels that pull people in and leave them with a clear lesson. Start with the most interesting moment. Build tension. Deliver a satisfying turn. Extract a universal lesson the reader can apply today. Write in first or second person, present tense where possible.",
+  "slides": [
+    { "slideNumber": 1, "type": "cover",   "purpose": "Drop into the most dramatic or surprising moment of the story first. In media res. Make them NEED to know what happens next." },
+    { "slideNumber": 2, "type": "content", "purpose": "Context — who, what, where. Set the stage quickly. Keep it minimal." },
+    { "slideNumber": 3, "type": "content", "purpose": "The conflict or challenge — what went wrong or what was at stake. Build tension." },
+    { "slideNumber": 4, "type": "content", "purpose": "The turning point — the decision, realization, or unexpected development." },
+    { "slideNumber": 5, "type": "content", "purpose": "The outcome — what happened as a result. Be specific, not vague." },
+    { "slideNumber": 6, "type": "content", "purpose": "The lesson — extract the universal principle. What should the reader do differently now?" },
+    { "slideNumber": 7, "type": "cta",     "purpose": "CTA that invites them into the conversation — ask a question or promise more stories like this." }
+  ]
+}

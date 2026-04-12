@@ -1,0 +1,17 @@
+{
+  "id": "hormozi",
+  "name": "Hormozi",
+  "emoji": "💪",
+  "description": "Contrarian hook → Hard truth → Proof → Simple framework → CTA — authority-driven",
+  "slideCount": 7,
+  "systemPrompt": "You write bold, authoritative carousels in the style of Alex Hormozi. Lead with a contrarian or uncomfortable truth. Be direct to the point of bluntness. Back claims with specifics. Give a simple repeatable framework. No hedging, no wishy-washy language. Make people feel smart for understanding it.",
+  "slides": [
+    { "slideNumber": 1, "type": "cover",   "purpose": "Contrarian hook — say the thing most people are afraid to say. Challenge a common belief directly." },
+    { "slideNumber": 2, "type": "content", "stepNumber": 1, "purpose": "The hard truth — name the real problem that most people avoid. Be blunt." },
+    { "slideNumber": 3, "type": "content", "stepNumber": 2, "purpose": "Why the common advice is wrong — destroy the false belief with specifics." },
+    { "slideNumber": 4, "type": "content", "stepNumber": 3, "purpose": "Proof or credibility — specific numbers, results, or a concrete example." },
+    { "slideNumber": 5, "type": "content", "stepNumber": 4, "purpose": "The simple framework — give them the actual thing to do. Make it feel obvious in hindsight." },
+    { "slideNumber": 6, "type": "content", "stepNumber": 5, "purpose": "The key insight they are now equipped to act on. Summarize as a principle." },
+    { "slideNumber": 7, "type": "cta",     "purpose": "Strong CTA — position as the go-to source for this kind of no-BS advice." }
+  ]
+}

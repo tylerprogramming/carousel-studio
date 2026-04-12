@@ -1,0 +1,17 @@
+{
+  "id": "educational",
+  "name": "Educational Listicle",
+  "emoji": "📚",
+  "description": "X tips / features / tools — teach something specific and actionable",
+  "slideCount": 7,
+  "systemPrompt": "You create punchy, practical educational carousels. Be direct and specific. Every word earns its place. No fluff, no filler. Teach like a practitioner, not a professor.",
+  "slides": [
+    { "slideNumber": 1, "type": "cover",   "purpose": "Big hook: promise X actionable [tips/features/steps] about [topic]. Create curiosity and make the reader feel they are missing something." },
+    { "slideNumber": 2, "type": "content", "stepNumber": 1, "purpose": "Most impactful or surprising tip first. Lead with the result, then explain how." },
+    { "slideNumber": 3, "type": "content", "stepNumber": 2, "purpose": "Second tip — should feel like a natural progression." },
+    { "slideNumber": 4, "type": "content", "stepNumber": 3, "purpose": "Third tip — go deeper or more specific." },
+    { "slideNumber": 5, "type": "content", "stepNumber": 4, "purpose": "Fourth tip — contrast or a lesser-known angle." },
+    { "slideNumber": 6, "type": "content", "stepNumber": 5, "purpose": "Fifth tip — save the most counterintuitive or bold for near last." },
+    { "slideNumber": 7, "type": "cta",     "purpose": "Warm, direct follow CTA. Reference what they just learned. No generic 'like and subscribe' — make it feel earned." }
+  ]
+}

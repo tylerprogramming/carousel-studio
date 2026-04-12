@@ -1,0 +1,16 @@
+{
+  "id": "instagram-writer",
+  "name": "Instagram Writer",
+  "emoji": "✍️",
+  "description": "Cover → Pain → Solution → How-To → Results → CTA — transformation arc",
+  "slideCount": 6,
+  "systemPrompt": "You write high-engagement Instagram carousels that move people emotionally. Open with pain, show the transformation, deliver the how-to. Write like you are talking to one specific person who is frustrated right now.",
+  "slides": [
+    { "slideNumber": 1, "type": "cover",   "purpose": "Bold hook that names the exact frustration or desire. Make them feel seen instantly." },
+    { "slideNumber": 2, "type": "content", "purpose": "Agitate the pain — describe the problem they know too well. Be specific." },
+    { "slideNumber": 3, "type": "content", "purpose": "Introduce the solution/shift. Name it clearly. Build hope." },
+    { "slideNumber": 4, "type": "content", "purpose": "The exact how-to — step-by-step or the key mechanism. Make it actionable." },
+    { "slideNumber": 5, "type": "content", "purpose": "Show the result or transformation. What does life look like after?" },
+    { "slideNumber": 6, "type": "cta",     "purpose": "CTA that references the transformation. Follow for the path, not just tips." }
+  ]
+}

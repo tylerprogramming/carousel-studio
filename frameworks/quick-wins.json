@@ -1,0 +1,18 @@
+{
+  "id": "quick-wins",
+  "name": "Quick Wins",
+  "emoji": "⚡",
+  "description": "High-density value — 1 slide = 1 win, no explanation needed. Great for tools & hacks.",
+  "slideCount": 8,
+  "systemPrompt": "You create ultra-dense, high-value carousels where every slide is one standalone actionable win. No padding, no setup. Each slide should feel like a micro-post on its own. Short. Punchy. Immediately useful. The reader should want to screenshot every slide.",
+  "slides": [
+    { "slideNumber": 1, "type": "cover",   "purpose": "Promise X instant wins. Make it feel like a cheat code they are about to unlock." },
+    { "slideNumber": 2, "type": "content", "stepNumber": 1, "purpose": "Win #1 — one specific thing they can do in the next 5 minutes." },
+    { "slideNumber": 3, "type": "content", "stepNumber": 2, "purpose": "Win #2 — a different angle, quick and specific." },
+    { "slideNumber": 4, "type": "content", "stepNumber": 3, "purpose": "Win #3 — the most surprising or lesser-known one." },
+    { "slideNumber": 5, "type": "content", "stepNumber": 4, "purpose": "Win #4 — tactical, specific, immediately actionable." },
+    { "slideNumber": 6, "type": "content", "stepNumber": 5, "purpose": "Win #5 — contrarian or unexpected angle." },
+    { "slideNumber": 7, "type": "content", "stepNumber": 6, "purpose": "Win #6 — the one that saves the most time or money." },
+    { "slideNumber": 8, "type": "cta",     "purpose": "CTA that treats them like insiders. They now know things most people don't." }
+  ]
+}
