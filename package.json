@@ -1,0 +1,13 @@
+{
+  "name": "carousel-maker",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently \"bun run server\" \"bun run client\"",
+    "server": "bun --watch server.ts",
+    "client": "cd client && bun run dev"
+  },
+  "dependencies": {
+    "hono": "^4.7.0",
+    "concurrently": "^9.0.0"
+  }
+}
