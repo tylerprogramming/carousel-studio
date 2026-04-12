@@ -1,6 +1,4 @@
-import { useState } from 'react'
 import { Slide, SlideType, BG_COLORS, TEXT_COLORS, ACCENT_COLORS } from '../types'
-import ImageLibrary from './ImageLibrary'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Textarea } from './ui/textarea'
@@ -12,9 +10,8 @@ interface Props {
   slide: Slide
   allSlides: Slide[]
   onChange: (updated: Slide) => void
-  onBgImage: (url: string, scope: 'single' | 'all', slideNumber?: number) => void
-  onBgImageEach: (updates: { slideNumber: number; url: string }[]) => void
-  twoCol?: boolean
+  onBgImage?: (url: string, scope: 'single' | 'all', slideNumber?: number) => void
+  onBgImageEach?: (updates: { slideNumber: number; url: string }[]) => void
 }
 
 // ── Shared UI helpers ─────────────────────────────────────────────────────────
@@ -43,242 +40,7 @@ function ColorSwatch({ color, active, onClick }: { color: { name: string; value:
   )
 }
 
-// ── Image Generation Panel ────────────────────────────────────────────────────
-
-type ImgScope = 'single' | 'all' | 'each'
-
-function ImagePanel({ slide, allSlides, onBgImage, onBgImageEach, onSlideChange, onGenerated }: {
-  slide: Slide
-  allSlides: Slide[]
-  onBgImage: (url: string, scope: 'single' | 'all', slideNumber?: number) => void
-  onBgImageEach: (updates: { slideNumber: number; url: string }[]) => void
-  onSlideChange: (updated: Slide) => void
-  onGenerated?: () => void
-}) {
-  const [scope, setScope]           = useState<ImgScope>('single')
-  const [prompt, setPrompt]         = useState('')
-  const [useLikeness, setUseLikeness] = useState(false)
-  const [generating, setGenerating] = useState(false)
-  const [progress, setProgress]     = useState('')
-  const [error, setError]           = useState('')
-
-  async function handleGenerate() {
-    setGenerating(true)
-    setError('')
-    setProgress(scope === 'each' ? 'Starting batch...' : 'Generating image...')
-
-    try {
-      const prefix = `bg_${Date.now()}`
-      const res = await fetch('/api/generate-bg-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: prompt.trim(),
-          scope,
-          slides: scope === 'each'
-            ? allSlides.map((s) => ({ slideNumber: s.slideNumber, headline: s.headline, emphasisLine: s.emphasisLine }))
-            : [],
-          outputPrefix: prefix,
-          useLikeness,
-        }),
-      })
-
-      const reader = res.body!.getReader()
-      const dec = new TextDecoder()
-      const batch: { slideNumber: number; url: string }[] = []
-
-      const finish = (err?: string) => {
-        reader.cancel().catch(() => {})
-        if (err) setError(err)
-        setGenerating(false)
-        setProgress('')
-        onGenerated?.()
-      }
-
-      outer: while (true) {
-        const { done: streamDone, value } = await reader.read()
-        if (streamDone) break
-        const text = dec.decode(value, { stream: true })
-        for (const line of text.split('\n')) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const evt = JSON.parse(line.slice(6))
-            if (evt.type === 'progress') {
-              setProgress(evt.message)
-            } else if (evt.type === 'error') {
-              finish(evt.message || 'Generation failed')
-              break outer
-            } else if (evt.type === 'image') {
-              if (scope === 'each') {
-                batch.push({ slideNumber: evt.slideNumber, url: evt.url })
-                setProgress(`Slide ${evt.slideNumber} done...`)
-              } else {
-                if (scope === 'all')    onBgImage(evt.url, 'all')
-                if (scope === 'single') onBgImage(evt.url, 'single', slide.slideNumber)
-              }
-            } else if (evt.type === 'complete') {
-              if (scope === 'each') onBgImageEach(batch)
-              finish()
-              break outer
-            }
-          } catch { /* skip malformed SSE line */ }
-        }
-      }
-    } catch (err) {
-      setError(String(err))
-      setGenerating(false)
-      setProgress('')
-    }
-  }
-
-  function autoFill() {
-    const parts = [slide.headline, slide.emphasisLine].filter(Boolean)
-    setPrompt(parts.length
-      ? `Abstract background for: "${parts.join(' — ')}". Modern minimal, geometric shapes, no text.`
-      : '')
-  }
-
-  const scopes: { value: ImgScope; label: string; desc: string }[] = [
-    { value: 'single', label: 'This Slide', desc: 'One image for this slide only' },
-    { value: 'all',    label: 'All Slides', desc: 'Same image on every slide' },
-    { value: 'each',   label: 'Each Slide', desc: 'Unique image per slide (batch)' },
-  ]
-
-  return (
-    <div className="flex flex-col gap-3">
-      {/* Scope */}
-      <div>
-        <Label className="mb-2 block">Generate For</Label>
-        <div className="flex flex-col gap-1.5">
-          {scopes.map((s) => (
-            <button
-              key={s.value}
-              onClick={() => setScope(s.value)}
-              title={s.desc}
-              className={cn(
-                'px-3 py-2 rounded-lg text-xs font-semibold text-left transition-all duration-150 cursor-pointer border',
-                scope === s.value
-                  ? 'border-primary bg-coral-light text-primary'
-                  : 'border-border bg-secondary text-muted-foreground hover:border-primary/40 hover:text-foreground'
-              )}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Prompt */}
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <Label>{scope === 'each' ? 'Base Style' : 'Prompt'}</Label>
-          {scope !== 'each' && (
-            <button onClick={autoFill} className="text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer">
-              Auto ↺
-            </button>
-          )}
-        </div>
-        <Textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder={scope === 'each' ? 'Optional base style...' : 'e.g. teal gradient, minimal geometric...'}
-          className="text-xs min-h-[68px]"
-          rows={3}
-        />
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="px-3 py-2 bg-destructive/10 border border-destructive/30 rounded-lg text-xs text-destructive">
-          {error}
-        </div>
-      )}
-
-      {/* Progress */}
-      {generating && progress && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="inline-block animate-spin-slow">⟳</span>
-          {progress}
-        </div>
-      )}
-
-      {/* Likeness toggle */}
-      <label className="flex items-center gap-2 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={useLikeness}
-          onChange={(e) => setUseLikeness(e.target.checked)}
-          className="w-3.5 h-3.5 accent-[var(--primary)] cursor-pointer"
-        />
-        <span className="text-xs text-muted-foreground">Use my likeness</span>
-      </label>
-
-      {/* Generate button */}
-      <Button
-        onClick={handleGenerate}
-        disabled={generating || (scope !== 'each' && !prompt.trim())}
-        variant={generating || (scope !== 'each' && !prompt.trim()) ? 'secondary' : 'default'}
-        size="sm"
-        className="w-full"
-      >
-        {generating
-          ? 'Generating...'
-          : scope === 'each'
-          ? `Generate ${allSlides.length} Images`
-          : 'Generate Background'}
-      </Button>
-
-      {/* Active image preview */}
-      {slide.backgroundImage && (
-        <div className="border-t border-border pt-3">
-          <div className="relative rounded-lg overflow-hidden mb-2.5" style={{ aspectRatio: '4/5' }}>
-            <img src={slide.backgroundImage} alt="bg" className="w-full h-full object-cover" />
-            <div className="absolute top-2 left-2 bg-emerald-500 text-white text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full">
-              Active
-            </div>
-          </div>
-          {/* Opacity */}
-          <div className="mb-2.5">
-            <div className="text-[10px] text-muted-foreground mb-1.5 flex justify-between">
-              <span>Overlay</span>
-              <span className="font-semibold text-foreground">{Math.round((slide.overlayOpacity ?? 0.45) * 100)}%</span>
-            </div>
-            <input
-              type="range" min={0} max={1} step={0.05}
-              value={slide.overlayOpacity ?? 0.45}
-              onChange={(e) => onSlideChange({ ...slide, overlayOpacity: parseFloat(e.target.value) })}
-              className="w-full"
-            />
-          </div>
-          <div className="flex gap-1.5">
-            {[{ label: 'Dark', val: '#000000' }, { label: 'Light', val: '#ffffff' }].map((o) => (
-              <button
-                key={o.val}
-                onClick={() => onSlideChange({ ...slide, overlayColor: o.val })}
-                className={cn(
-                  'flex-1 py-1.5 text-[11px] font-semibold rounded-md border transition-all cursor-pointer',
-                  (slide.overlayColor ?? '#000000') === o.val
-                    ? 'border-primary bg-coral-light text-primary'
-                    : 'border-border bg-secondary text-foreground hover:border-primary/40'
-                )}
-              >
-                {o.label}
-              </button>
-            ))}
-            <button
-              onClick={() => onSlideChange({ ...slide, backgroundImage: undefined })}
-              className="flex-1 py-1.5 text-[11px] font-semibold rounded-md border border-destructive/40 bg-destructive/5 text-destructive cursor-pointer hover:bg-destructive/10 transition-all"
-            >
-              Remove
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Main Editor ──────────────────────────────────────────────────────────────
+// ── Main Editor ───────────────────────────────────────────────────────────────
 
 const SLIDE_TYPES: { value: SlideType; label: string }[] = [
   { value: 'cover', label: 'Cover' },
@@ -286,24 +48,16 @@ const SLIDE_TYPES: { value: SlideType; label: string }[] = [
   { value: 'cta', label: 'CTA' },
 ]
 
-export default function SlideEditor({ slide, allSlides, onChange, onBgImage, onBgImageEach, twoCol = false }: Props) {
-  const [imgOpen, setImgOpen]       = useState(false)
-  const [libraryKey, setLibraryKey] = useState(0)
-
+export default function SlideEditor({ slide, onChange }: Props) {
   function set<K extends keyof Slide>(key: K, val: Slide[K]) {
     onChange({ ...slide, [key]: val })
   }
 
-  const panelStyle = twoCol
-    ? { flex: '0 1 620px', minWidth: 500, maxWidth: 740 }
-    : { flex: '0 1 420px', minWidth: 320, maxWidth: 520 }
-
   return (
     <div
-      className="flex overflow-hidden bg-card border-r border-border shrink"
-      style={panelStyle}
+      className="flex overflow-hidden bg-card border-r border-border shrink-0"
+      style={{ width: 340, minWidth: 300, maxWidth: 380 }}
     >
-      {/* ── Left: slide fields ── */}
       <div className="flex-1 overflow-y-auto p-4 min-w-0 scrollbar-thin">
 
         {/* Slide type */}
@@ -316,7 +70,7 @@ export default function SlideEditor({ slide, allSlides, onChange, onBgImage, onB
                 className={cn(
                   'flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer border',
                   slide.type === t.value
-                    ? 'bg-primary text-primary-foreground border-primary shadow-soft'
+                    ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-secondary text-muted-foreground border-border hover:border-primary/40 hover:text-foreground'
                 )}
               >
@@ -395,7 +149,7 @@ export default function SlideEditor({ slide, allSlides, onChange, onBgImage, onB
                     className={cn(
                       'w-9 h-8 rounded-md text-xs font-semibold border transition-all duration-150 cursor-pointer',
                       active
-                        ? 'bg-primary text-primary-foreground border-primary shadow-soft'
+                        ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-secondary text-muted-foreground border-border hover:border-primary/40 hover:text-foreground'
                     )}
                   >
@@ -446,7 +200,7 @@ export default function SlideEditor({ slide, allSlides, onChange, onBgImage, onB
                   className={cn(
                     'px-3 py-1.5 rounded-md text-xs font-semibold border transition-all duration-150 cursor-pointer',
                     active
-                      ? 'border-primary bg-coral-light text-primary'
+                      ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border bg-secondary hover:border-primary/40'
                   )}
                   style={{ color: active ? undefined : c.value === '#FFFFFF' ? '#18181b' : c.value }}
@@ -478,11 +232,16 @@ export default function SlideEditor({ slide, allSlides, onChange, onBgImage, onB
         <FieldSection title="Footer Color">
           <div className="flex items-center gap-2">
             {['#FFFFFF', '#1B1B1B', '#F5F0EB', slide.accentColor].map((c) => (
-              <button key={c} onClick={() => set('footerColor', c)} style={{ background: c, width: 28, height: 28, borderRadius: 6, border: (slide.footerColor ?? '#FFFFFF').toLowerCase() === c.toLowerCase() ? '2px solid #e07355' : '2px solid transparent', cursor: 'pointer' }} title={c} />
+              <button
+                key={c}
+                onClick={() => set('footerColor', c)}
+                style={{ background: c, width: 28, height: 28, borderRadius: 6, border: (slide.footerColor ?? '#FFFFFF').toLowerCase() === c.toLowerCase() ? '2.5px solid #5B6CF2' : '2px solid transparent', cursor: 'pointer', outline: '1px solid rgba(0,0,0,0.08)' }}
+                title={c}
+              />
             ))}
             <input type="color" value={slide.footerColor ?? '#FFFFFF'} onChange={(e) => set('footerColor', e.target.value)}
               title="Custom" className="w-7 h-7 rounded-md cursor-pointer border border-border p-0.5" />
-            <span className="text-xs text-muted-foreground ml-1">Save for Later / Swipe text</span>
+            <span className="text-xs text-muted-foreground ml-1">Footer text</span>
           </div>
         </FieldSection>
 
@@ -502,62 +261,7 @@ export default function SlideEditor({ slide, allSlides, onChange, onBgImage, onB
           </div>
         </FieldSection>
 
-        {/* BG accordion — single-column only */}
-        {!twoCol && (
-          <>
-            <Separator className="my-4" />
-            <div className="mb-4">
-              <button
-                onClick={() => setImgOpen((o) => !o)}
-                className={cn(
-                  'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold border transition-all duration-150 cursor-pointer',
-                  imgOpen
-                    ? 'border-primary bg-coral-light text-primary'
-                    : 'border-border bg-secondary text-foreground hover:border-primary/40'
-                )}
-              >
-                <span>🖼 Background Image</span>
-                <span className={cn('text-[10px]', slide.backgroundImage ? 'text-emerald-500' : 'text-muted-foreground')}>
-                  {slide.backgroundImage ? '● Active' : imgOpen ? '▲' : '▼'}
-                </span>
-              </button>
-              {imgOpen && (
-                <div className="mt-3 animate-fade-in">
-                  <ImagePanel
-                    slide={slide}
-                    allSlides={allSlides}
-                    onBgImage={onBgImage}
-                    onBgImageEach={onBgImageEach}
-                    onSlideChange={onChange}
-                    onGenerated={() => setLibraryKey((k) => k + 1)}
-                  />
-                  <div className="border-t border-border pt-3.5 mt-3.5">
-                    <ImageLibrary compact={false} refreshKey={libraryKey} onApply={(url) => onChange({ ...slide, backgroundImage: url })} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        )}
       </div>
-
-      {/* ── Right: BG image panel (wide screens only) ── */}
-      {twoCol && (
-        <div className="w-52 shrink-0 border-l border-border overflow-y-auto p-4 bg-secondary/30 scrollbar-thin">
-          <Label className="mb-3.5 block">🖼 Background Image</Label>
-          <ImagePanel
-            slide={slide}
-            allSlides={allSlides}
-            onBgImage={onBgImage}
-            onBgImageEach={onBgImageEach}
-            onSlideChange={onChange}
-            onGenerated={() => setLibraryKey((k) => k + 1)}
-          />
-          <div className="border-t border-border pt-3.5 mt-3.5">
-            <ImageLibrary compact={true} refreshKey={libraryKey} onApply={(url) => onChange({ ...slide, backgroundImage: url })} />
-          </div>
-        </div>
-      )}
     </div>
   )
 }
