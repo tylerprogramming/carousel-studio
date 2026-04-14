@@ -13,6 +13,6 @@ export function useMediaQuery(query: string): boolean {
   return matches
 }
 
-export function useIsMobile() { return useMediaQuery('(max-width: 767px)') }
-export function useIsTablet()  { return useMediaQuery('(min-width: 768px) and (max-width: 1023px)') }
+export function useIsMobile() { return useMediaQuery('(max-width: 1199px)') }
+export function useIsTablet()  { return useMediaQuery('(min-width: 768px) and (max-width: 1199px)') }
 export function useIsWide()    { return useMediaQuery('(min-width: 1300px)') }
