@@ -3,6 +3,7 @@ import { Slide, CarouselConfig, defaultSlides, genId } from './types'
 import { useIsMobile, useIsWide } from './hooks/useMediaQuery'
 import SlideList from './components/SlideList'
 import SlideEditor from './components/SlideEditor'
+import SlidePreview from './components/SlidePreview'
 import BgImageCard from './components/BgImageCard'
 import InstagramPreview from './components/InstagramPreview'
 import GenerateModal from './components/GenerateModal'
@@ -661,8 +662,8 @@ export default function App() {
                 {/* Mobile slide grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   {config.slides.map((slide, i) => {
-                    const THUMB_W = (window.innerWidth - 52) / 2
-                    const scale   = THUMB_W / 1080
+                    const THUMB_W = Math.floor((window.innerWidth - 52) / 2)
+                    const thumbScale = THUMB_W / 1080
                     const THUMB_H = Math.round(THUMB_W * 1350 / 1080)
                     return (
                       <div
@@ -671,12 +672,14 @@ export default function App() {
                         style={{
                           borderRadius: 10, overflow: 'hidden', cursor: 'pointer', position: 'relative',
                           border: `2px solid ${i === activeIndex ? BLUE : BORDER}`,
-                          background: slide.bgColor, height: THUMB_H,
+                          width: THUMB_W, height: THUMB_H,
                           boxShadow: i === activeIndex ? `0 0 0 3px ${BLUE_LIGHT}` : 'none',
-                          transition: 'all 0.15s',
+                          transition: 'border-color 0.15s, box-shadow 0.15s',
+                          flexShrink: 0,
                         }}
                       >
-                        <div style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.5)', color: '#fff', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700, zIndex: 2 }}>{i + 1}</div>
+                        <SlidePreview slide={slide} scale={thumbScale} totalSlides={config.slides.length} />
+                        <div style={{ position: 'absolute', bottom: 6, right: 6, background: 'rgba(0,0,0,0.55)', color: '#fff', borderRadius: 6, padding: '2px 7px', fontSize: 10, fontWeight: 700, zIndex: 2 }}>{i + 1}</div>
                         <button
                           onClick={(e) => { e.stopPropagation(); removeSlide(i) }}
                           style={{
@@ -704,8 +707,25 @@ export default function App() {
               </div>
             )}
             {mobileTab === 'edit' && activeSlide && (
-              <div style={{ height: '100%', overflowY: 'auto' }}>
-                <SlideEditor slide={activeSlide} allSlides={config.slides} onChange={updateSlide} />
+              <div style={{ height: '100%', display: 'flex', overflow: 'hidden' }}>
+                {/* Left: editor */}
+                <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', borderRight: `1px solid ${BORDER}` }}>
+                  <SlideEditor slide={activeSlide} allSlides={config.slides} onChange={updateSlide} />
+                </div>
+                {/* Right: live preview panel */}
+                <div style={{
+                  width: 210, flexShrink: 0, background: BG,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  padding: '16px 10px', gap: 10, overflowY: 'auto',
+                }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Live Preview</div>
+                  <div style={{ width: 190, height: Math.round(190 * 1350 / 1080), borderRadius: 8, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.18)', flexShrink: 0 }}>
+                    <SlidePreview slide={activeSlide} scale={190 / 1080} totalSlides={config.slides.length} />
+                  </div>
+                  <div style={{ fontSize: 11, color: MUTED, fontWeight: 600 }}>
+                    Slide {activeIndex + 1} / {config.slides.length}
+                  </div>
+                </div>
               </div>
             )}
             {mobileTab === 'bg' && activeSlide && (
@@ -722,8 +742,10 @@ export default function App() {
             {mobileTab === 'preview' && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {controlsPanel}
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <InstagramPreview slides={config.slides} activeIndex={previewIndex} onIndexChange={(i) => { setPreviewIndex(i); setActiveIndex(i) }} platform={config.platform} />
+                <div style={{ flex: 1, overflow: 'auto', display: 'flex', justifyContent: 'center', paddingTop: 8 }}>
+                  <div style={{ zoom: 0.78, transformOrigin: 'top center' }}>
+                    <InstagramPreview slides={config.slides} activeIndex={previewIndex} onIndexChange={(i) => { setPreviewIndex(i); setActiveIndex(i) }} platform={config.platform} />
+                  </div>
                 </div>
               </div>
             )}
