@@ -1,22 +1,25 @@
 # Carousel Studio
 
-A local web app for creating branded Instagram carousels with AI-generated background images. Built with Bun, Hono, React, and Vite.
+A local web app for creating branded Instagram and LinkedIn carousels with AI-generated background images. Built with Bun, Hono, React, and Vite.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![Bun](https://img.shields.io/badge/runtime-Bun-black)
 
 ## Features
 
 - **5 Content Frameworks** - Educational, Hormozi, Quick Wins, Storytelling, Instagram Writer
-- **AI Background Images** - Generate per-slide or batch backgrounds via Kie.ai (Nano Banana 2)
-- **Likeness Support** - Reference your own photo when generating AI images
-- **Image Library** - Previously generated backgrounds are saved and reusable
-- **Live Preview** - See exactly how slides look as you edit
+- **Multi-Platform Previews** - Instagram feed, LinkedIn feed, and TikTok (coming soon) phone mockups
+- **AI Background Images** - Generate per-slide or batch backgrounds via Kie.ai (auto-selects Nano Banana Pro when using likeness, Nano Banana 2 otherwise)
+- **Likeness Support** - Reference your own photo for AI-generated images; set a description to ensure correct gender/appearance
+- **Cancel Generation** - Abort a stuck generation mid-stream with the × button
+- **Image Library** - Previously generated backgrounds saved and reusable across slides
+- **Live Preview** - See exactly how slides look as you edit (including a side-by-side panel on tablet)
 - **Text Scale** - Per-slide font size control (XS → XL + fine-tuned slider)
 - **Footer Branding** - "Save for Later" + "Swipe" footer on every slide (except the last)
-- **Save & Load** - Carousels auto-save to local JSON files, reload from the drawer
+- **Save & Load** - Carousels auto-save to local JSON files, reload from the library drawer
 - **Bulk Generate** - Generate multiple carousels at once from a list of topics
 - **Export** - Download individual slide PNGs or a combined multi-page PDF
+- **iPad / Tablet Support** - Responsive tab-based layout (Slides / Edit / BG / Preview) for screens under 1200px
 
 ## Tech Stack
 
@@ -25,7 +28,6 @@ A local web app for creating branded Instagram carousels with AI-generated backg
 | Runtime | [Bun](https://bun.sh) |
 | API Server | [Hono](https://hono.dev) (port 3010) |
 | Frontend | React 18 + Vite (port 5175) |
-| Styling | Tailwind CSS + Radix UI |
 | Image Generation | [Kie.ai](https://kie.ai) via Python script |
 | Slide Rendering | PIL (Pillow) for PNG export |
 | PDF Export | PIL multi-page PDF |
@@ -63,11 +65,12 @@ If you want AI-generated backgrounds to include your photo, create a `settings.j
 
 ```json
 {
-  "likenessPath": "/absolute/path/to/your-photo.png"
+  "likenessPath": "/absolute/path/to/your-photo.png",
+  "likenessDescription": "The person in the image is a young adult male. Always generate a male person, not female."
 }
 ```
 
-Then check "Use my likeness" in the Background Image panel before generating.
+`likenessDescription` is appended to your prompt when "Use my likeness" is checked, ensuring the AI generates the correct gender and appearance. Adjust the description to match you.
 
 ### 4. Run the dev server
 
@@ -77,36 +80,47 @@ bun run dev
 
 Open [http://localhost:5175](http://localhost:5175) in your browser.
 
+### 5. (Optional) Access from iPad via ngrok
+
+```bash
+# Install ngrok and authenticate, then:
+ngrok http --url=your-static-domain.ngrok-free.app --basic-auth="user:password" 5175
+```
+
+Add your ngrok domain to `client/vite.config.ts` under `server.allowedHosts`.
+
 ## Project Structure
 
 ```
 carousel-studio/
-├── server.ts              # Hono API server (port 3010)
-├── generate_slide.py      # PIL slide renderer + PDF combiner
-├── generate_bg_image.py   # Kie.ai image generation script
-├── frameworks/            # JSON framework definitions
+├── server.ts                  # Hono API server (port 3010)
+├── generate_slide.py          # PIL slide renderer + PDF combiner
+├── generate_bg_image.py       # Kie.ai image generation script
+├── settings.json              # Local config: likenessPath, likenessDescription (gitignored)
+├── frameworks/                # JSON framework definitions
 │   ├── educational.json
 │   ├── hormozi.json
 │   ├── quick-wins.json
 │   ├── storytelling.json
 │   └── instagram-writer.json
-├── client/                # React + Vite frontend
+├── client/                    # React + Vite frontend
 │   └── src/
 │       ├── App.tsx
 │       ├── types.ts
 │       ├── components/
-│       │   ├── SlidePreview.tsx       # Live slide renderer
-│       │   ├── SlideEditor.tsx        # Slide content + style editor
-│       │   ├── SlideList.tsx          # Slide strip navigation
-│       │   ├── BatchModal.tsx         # Bulk carousel generator
-│       │   ├── SavedCarouselsDrawer.tsx
-│       │   ├── ImageLibrary.tsx
-│       │   └── GenerateModal.tsx
+│       │   ├── SlidePreview.tsx         # Live slide renderer (used everywhere)
+│       │   ├── SlideEditor.tsx          # Slide content + style editor
+│       │   ├── SlideList.tsx            # Slide strip navigation
+│       │   ├── BgImageCard.tsx          # Background image generation panel
+│       │   ├── InstagramPreview.tsx     # Platform phone mockups (IG / LinkedIn / TikTok)
+│       │   ├── BatchModal.tsx           # Bulk carousel generator
+│       │   ├── SavedCarouselsDrawer.tsx # Load / delete saved carousels
+│       │   ├── ImageLibrary.tsx         # Browse and apply generated images
+│       │   └── GenerateModal.tsx        # AI slide content generator
 │       └── hooks/
-│           └── useMediaQuery.ts
-├── output/                # Generated PNGs (gitignored)
-├── carousels/             # Saved carousel JSON files (gitignored)
-└── settings.json          # Local config: likenessPath (gitignored)
+│           └── useMediaQuery.ts        # Responsive breakpoints
+├── output/                    # Generated PNGs (gitignored)
+└── carousels/                 # Saved carousel JSON files (gitignored)
 ```
 
 ## API Endpoints
@@ -120,11 +134,21 @@ carousel-studio/
 | `GET` | `/api/carousels/:id` | Load a carousel |
 | `DELETE` | `/api/carousels/:id` | Delete a carousel |
 | `POST` | `/api/bulk-generate` | Bulk generate multiple carousels |
-| `POST` | `/api/generate-bg-image` | Generate AI background (SSE stream) |
+| `POST` | `/api/generate-bg-image` | Generate AI background via SSE stream |
 | `POST` | `/api/export-slide` | Render one slide to PNG |
 | `POST` | `/api/export-all` | Export all slides to PNG + PDF |
 | `GET` | `/api/settings` | Get app settings |
 | `POST` | `/api/settings` | Update app settings |
+| `GET` | `/files/:filename` | Serve generated output images |
+
+## AI Background Generation
+
+The `generate_bg_image.py` script handles all Kie.ai image generation:
+
+- Uses **Nano Banana Pro** when a reference/likeness image is provided (better face fidelity)
+- Uses **Nano Banana 2** for text-only prompts
+- Polls up to 360 seconds with retry logic
+- Streams progress back to the UI via SSE
 
 ## Frameworks
 
@@ -140,7 +164,7 @@ Frameworks define the slide structure, tone, and content style. Each framework i
 }
 ```
 
-You can add your own by dropping a new `.json` file in `frameworks/` — the server auto-discovers them.
+Add your own by dropping a new `.json` file in `frameworks/` — the server auto-discovers them.
 
 ## Export
 
