@@ -408,6 +408,64 @@ app.post('/api/export-all', async (c) => {
   })
 })
 
+// ── Flash video generation ────────────────────────────────────────────────────
+
+app.post('/api/flash-video', async (c) => {
+  const body = await c.req.json()
+  const { carouselId, slideNumber, carouselTitle } = body
+  const ts = Date.now()
+  const filename = `flash_${carouselId || 'carousel'}_s${slideNumber || 1}_${ts}.mp4`
+  const outputPath = join(OUTPUT_DIR, filename)
+  const payload = JSON.stringify({ ...body, output: outputPath, outputDir: OUTPUT_DIR })
+  const scriptPath = join(import.meta.dir, 'flash_video.py')
+  const proc = Bun.spawn(['python3', scriptPath, payload], { stdout: 'pipe', stderr: 'pipe' })
+  const exitCode = await proc.exited
+  const stderr = await new Response(proc.stderr).text()
+  if (exitCode !== 0) return c.json({ error: `Flash video failed: ${stderr}` }, 500)
+
+  // Save JSON sidecar
+  const meta = {
+    id: filename.replace('.mp4', ''),
+    carouselId: carouselId || null,
+    carouselTitle: carouselTitle || null,
+    slideNumber: slideNumber || 1,
+    style: body.style || 'statement',
+    duration: body.duration || 5,
+    headline: body.headline || '',
+    emphasisLine: body.emphasisLine || '',
+    subText: body.subText || '',
+    ctaText: body.ctaText || '',
+    listItems: body.listItems || [],
+    summaryLine: body.summaryLine || '',
+    handle: body.handle || '@tylerai_dev',
+    bgColor: body.bgColor || '#F5F0EB',
+    textColor: body.textColor || '#1B1B1B',
+    accentColor: body.accentColor || '#E07355',
+    backgroundVideo: body.backgroundVideo || null,
+    backgroundImage: body.backgroundImage || null,
+    overlayOpacity: body.overlayOpacity ?? 0.45,
+    mp4: filename,
+    url: `/files/${filename}`,
+    generatedAt: new Date().toISOString(),
+  }
+  writeFileSync(join(OUTPUT_DIR, filename.replace('.mp4', '.json')), JSON.stringify(meta, null, 2))
+
+  // Update flash_index.json (newest first, deduplicated by carouselId+slideNumber)
+  const indexPath = join(OUTPUT_DIR, 'flash_index.json')
+  let index: any[] = []
+  try { index = JSON.parse(readFileSync(indexPath, 'utf8')) } catch { /* new */ }
+  index = index.filter((e: any) => !(e.carouselId === meta.carouselId && e.slideNumber === meta.slideNumber))
+  index.unshift(meta)
+  writeFileSync(indexPath, JSON.stringify(index, null, 2))
+
+  return c.json({ url: `/files/${filename}`, filename, meta })
+})
+
+app.get('/api/flash-videos', (c) => {
+  const indexPath = join(OUTPUT_DIR, 'flash_index.json')
+  try { return c.json(JSON.parse(readFileSync(indexPath, 'utf8'))) } catch { return c.json([]) }
+})
+
 // ── Generated image library ───────────────────────────────────────────────────
 
 app.get('/api/images', (c) => {
@@ -454,10 +512,13 @@ app.get('/files/:filename', async (c) => {
   const filePath = join(OUTPUT_DIR, filename)
   if (!existsSync(filePath)) return c.text('Not found', 404)
   const file = Bun.file(filePath)
-  const contentType = filename.endsWith('.pdf') ? 'application/pdf' : 'image/png'
+  const contentType = filename.endsWith('.pdf') ? 'application/pdf'
+    : filename.endsWith('.mp4') ? 'video/mp4'
+    : filename.endsWith('.webm') ? 'video/webm'
+    : 'image/png'
   const disposition = filename.endsWith('.pdf') ? `attachment; filename="${filename}"` : 'inline'
   return new Response(file, {
-    headers: { 'Content-Type': contentType, 'Cache-Control': 'no-store', 'Content-Disposition': disposition },
+    headers: { 'Content-Type': contentType, 'Cache-Control': 'no-store', 'Content-Disposition': disposition, 'Accept-Ranges': 'bytes' },
   })
 })
 
