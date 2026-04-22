@@ -361,39 +361,45 @@ export default function PlatformPreview({ slides, activeIndex, onIndexChange, pl
   function prev() { if (activeIndex > 0) onIndexChange(activeIndex - 1) }
   function next() { if (activeIndex < slides.length - 1) onIndexChange(activeIndex + 1) }
 
+  const arrowBtn = (onClick: () => void, dir: '←' | '→', side: 'left' | 'right') => (
+    <button onClick={onClick} style={{
+      position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+      [side]: 8,
+      width: 34, height: 34, borderRadius: '50%',
+      border: '1.5px solid rgba(0,0,0,0.12)',
+      background: 'rgba(255,255,255,0.92)',
+      color: '#18181b', cursor: 'pointer', fontSize: 15,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.15)', transition: 'all 0.15s', zIndex: 10,
+      backdropFilter: 'blur(4px)',
+    }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = '#fff' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.92)' }}
+    >{dir}</button>
+  )
+
   return (
     <div style={{
       flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'flex-start', overflowY: 'auto', padding: '24px 0',
+      justifyContent: 'flex-start', overflowY: 'auto', padding: '20px 0',
       background: bgColor,
     }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
         {label}
       </div>
 
-      {platform === 'instagram' && <InstagramPhone slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} />}
-      {platform === 'linkedin'  && <LinkedInPhone  slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} />}
-      {platform === 'tiktok'    && <TikTokPhone    slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} />}
+      {/* Phone wrapped in relative div so arrows can overlay the sides */}
+      <div style={{ position: 'relative', flexShrink: 0 }}>
+        {platform === 'instagram' && <InstagramPhone slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} />}
+        {platform === 'linkedin'  && <LinkedInPhone  slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} />}
+        {platform === 'tiktok'    && <TikTokPhone    slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} />}
 
-      {/* Nav arrows */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 18 }}>
-        {[
-          { fn: prev, icon: '←', disabled: activeIndex === 0 },
-          { fn: next, icon: '→', disabled: activeIndex === slides.length - 1 },
-        ].map(({ fn, icon, disabled }) => (
-          <button key={icon} onClick={fn} disabled={disabled} style={{
-            width: 38, height: 38, borderRadius: '50%',
-            border: '1px solid #e4e4e7',
-            background: disabled ? '#f9f9f9' : '#fff',
-            color: disabled ? '#d4d4d8' : '#18181b',
-            cursor: disabled ? 'default' : 'pointer', fontSize: 16, transition: 'all 0.15s',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: disabled ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
-          }}>{icon}</button>
-        ))}
-        <span style={{ fontSize: 12, color: '#a1a1aa' }}>
-          {activeIndex + 1} of {slides.length}
-        </span>
+        {activeIndex > 0               && arrowBtn(prev, '←', 'left')}
+        {activeIndex < slides.length-1 && arrowBtn(next, '→', 'right')}
+      </div>
+
+      <div style={{ marginTop: 12, fontSize: 12, color: '#a1a1aa', fontWeight: 600 }}>
+        {activeIndex + 1} of {slides.length}
       </div>
     </div>
   )

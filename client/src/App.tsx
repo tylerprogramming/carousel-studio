@@ -9,12 +9,15 @@ import InstagramPreview from './components/InstagramPreview'
 import GenerateModal from './components/GenerateModal'
 import SavedCarouselsDrawer from './components/SavedCarouselsDrawer'
 import BatchModal from './components/BatchModal'
+import FlashVideoPanel from './components/FlashVideoPanel'
+import TikTokPanel from './components/TikTokPanel'
 
 type MobileTab = 'slides' | 'edit' | 'bg' | 'preview'
 
 const CAROUSEL_ID_KEY = 'carousel_maker_current_id'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
+const TIKTOK     = '#FE2C55'
 const BLUE       = '#5B6CF2'
 const BLUE_LIGHT = '#EEF0FD'
 const BLUE_HOVER = '#4A59E0'
@@ -305,38 +308,8 @@ export default function App() {
       background: WHITE, borderBottom: `1px solid ${BORDER}`,
       padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0,
     }}>
-      {/* Row 1: Platform + Library + Generate + Batch */}
+      {/* Row 1: Library + Generate + Batch */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {/* Platform */}
-        <div style={{ display: 'flex', background: BG, borderRadius: 9, padding: 3, gap: 2, border: `1.5px solid ${BORDER}` }}>
-          {([
-            { id: 'instagram', label: 'IG',  logo: <IgLogo size={15} />,      soon: false },
-            { id: 'linkedin',  label: 'LI',  logo: <LiLogo size={15} />,      soon: false },
-            { id: 'tiktok',    label: 'TT',  logo: <TikTokLogo size={15} />,  soon: true  },
-          ] as const).map((p) => (
-            <button
-              key={p.id}
-              onClick={() => !p.soon && setConfig((c) => ({ ...c, platform: p.id }))}
-              title={p.soon ? 'Coming soon' : undefined}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '4px 10px', border: 'none', borderRadius: 7,
-                background: config.platform === p.id ? WHITE : 'transparent',
-                color: p.soon ? '#ccc' : config.platform === p.id ? TEXT : MUTED,
-                fontSize: 12, fontWeight: 600,
-                cursor: p.soon ? 'not-allowed' : 'pointer',
-                transition: 'all 0.15s',
-                opacity: p.soon ? 0.45 : 1,
-                boxShadow: config.platform === p.id ? '0 1px 3px rgba(30,40,100,0.1)' : 'none',
-                position: 'relative',
-              }}
-            >
-              {p.logo} {p.label}
-              {p.soon && <span style={{ fontSize: 8, fontWeight: 700, color: MUTED, letterSpacing: '0.04em', marginLeft: 1 }}>SOON</span>}
-            </button>
-          ))}
-        </div>
-
         {/* Library */}
         <button
           onClick={() => setShowSaved(true)}
@@ -480,6 +453,29 @@ export default function App() {
       {/* Save status */}
       {saveIndicator}
 
+      {/* Platform switcher — always visible */}
+      {!isMobile && (
+        <div style={{ display: 'flex', background: BG, borderRadius: 9, padding: 3, gap: 2, border: `1.5px solid ${BORDER}` }}>
+          {([
+            { id: 'instagram', label: 'IG', logo: <IgLogo size={15} /> },
+            { id: 'linkedin',  label: 'LI', logo: <LiLogo size={15} /> },
+            { id: 'tiktok',    label: 'TT', logo: <TikTokLogo size={15} /> },
+          ] as const).map((p) => (
+            <button key={p.id} onClick={() => setConfig((c) => ({ ...c, platform: p.id }))}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '4px 10px', border: 'none', borderRadius: 7,
+                background: config.platform === p.id ? (p.id === 'tiktok' ? TIKTOK : WHITE) : 'transparent',
+                color: config.platform === p.id ? (p.id === 'tiktok' ? WHITE : TEXT) : MUTED,
+                fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
+                boxShadow: config.platform === p.id ? '0 1px 3px rgba(30,40,100,0.1)' : 'none',
+              }}>
+              {p.logo} {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div style={{ flex: 1 }} />
 
       {/* Mobile: generate + export in header */}
@@ -580,35 +576,42 @@ export default function App() {
       {header}
       {exportToast}
 
-      {/* ── Desktop 4-column ── */}
+      {/* ── Desktop layout ── */}
       {!isMobile && (
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-          {/* 1. Slide strip */}
-          <SlideList slides={config.slides} activeIndex={activeIndex} onSelect={handleSelect} onAdd={addSlide} onRemove={removeSlide} onReorder={reorder} />
+          {config.platform === 'tiktok' ? (
+            /* TikTok mode: slide strip (select source) + TikTok panel (own text, own controls) */
+            <>
+              <SlideList slides={config.slides} activeIndex={activeIndex} onSelect={handleSelect} onAdd={addSlide} onRemove={removeSlide} onReorder={reorder} />
+              <TikTokPanel slides={config.slides} activeIndex={activeIndex} carouselId={carouselId} />
+            </>
+          ) : (
+            /* IG / LinkedIn mode: full 4-column carousel editor */
+            <>
+              <SlideList slides={config.slides} activeIndex={activeIndex} onSelect={handleSelect} onAdd={addSlide} onRemove={removeSlide} onReorder={reorder} />
 
-          {/* 2. Content editor */}
-          {activeSlide && (
-            <SlideEditor slide={activeSlide} allSlides={config.slides} onChange={updateSlide} />
+              {activeSlide && (
+                <SlideEditor slide={activeSlide} allSlides={config.slides} onChange={updateSlide} />
+              )}
+
+              {activeSlide && (
+                <BgImageCard
+                  slide={activeSlide}
+                  allSlides={config.slides}
+                  onBgImage={applyBgImage}
+                  onBgImageEach={applyBgImageEach}
+                  onSlideChange={updateSlide}
+                />
+              )}
+
+              <div style={{ flex: '1 1 340px', minWidth: 300, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: BG }}>
+                {controlsPanel}
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  <InstagramPreview slides={config.slides} activeIndex={previewIndex} onIndexChange={(i) => { setPreviewIndex(i); setActiveIndex(i) }} platform={config.platform} />
+                </div>
+              </div>
+            </>
           )}
-
-          {/* 3. Background image card */}
-          {activeSlide && (
-            <BgImageCard
-              slide={activeSlide}
-              allSlides={config.slides}
-              onBgImage={applyBgImage}
-              onBgImageEach={applyBgImageEach}
-              onSlideChange={updateSlide}
-            />
-          )}
-
-          {/* 4. Preview + controls */}
-          <div style={{ flex: '1 1 340px', minWidth: 300, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: BG }}>
-            {controlsPanel}
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <InstagramPreview slides={config.slides} activeIndex={previewIndex} onIndexChange={(i) => { setPreviewIndex(i); setActiveIndex(i) }} platform={config.platform} />
-            </div>
-          </div>
         </div>
       )}
 
@@ -633,29 +636,25 @@ export default function App() {
                 {/* Mobile platform */}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                   {([
-                    { id: 'instagram', label: 'Instagram', logo: <IgLogo size={16} />,     soon: false },
-                    { id: 'linkedin',  label: 'LinkedIn',  logo: <LiLogo size={16} />,     soon: false },
-                    { id: 'tiktok',    label: 'TikTok',    logo: <TikTokLogo size={16} />, soon: true  },
+                    { id: 'instagram', label: 'Instagram', logo: <IgLogo size={16} /> },
+                    { id: 'linkedin',  label: 'LinkedIn',  logo: <LiLogo size={16} /> },
+                    { id: 'tiktok',    label: 'TikTok',    logo: <TikTokLogo size={16} /> },
                   ] as const).map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => !p.soon && setConfig((c) => ({ ...c, platform: p.id }))}
-                      title={p.soon ? 'Coming soon' : undefined}
+                      onClick={() => setConfig((c) => ({ ...c, platform: p.id }))}
                       style={{
                         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                         padding: '9px 4px',
-                        border: `1.5px solid ${!p.soon && config.platform === p.id ? BLUE : BORDER}`,
+                        border: `1.5px solid ${config.platform === p.id ? (p.id === 'tiktok' ? TIKTOK : BLUE) : BORDER}`,
                         borderRadius: 10,
-                        background: !p.soon && config.platform === p.id ? BLUE_LIGHT : WHITE,
-                        color: p.soon ? '#ccc' : config.platform === p.id ? BLUE : MUTED,
+                        background: config.platform === p.id ? (p.id === 'tiktok' ? '#fff0f3' : BLUE_LIGHT) : WHITE,
+                        color: config.platform === p.id ? (p.id === 'tiktok' ? TIKTOK : BLUE) : MUTED,
                         fontSize: 12, fontWeight: 600,
-                        cursor: p.soon ? 'not-allowed' : 'pointer',
-                        opacity: p.soon ? 0.5 : 1,
-                        transition: 'all 0.15s',
+                        cursor: 'pointer', transition: 'all 0.15s',
                       }}
                     >
                       {p.logo} {p.label}
-                      {p.soon && <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.04em' }}>SOON</span>}
                     </button>
                   ))}
                 </div>
