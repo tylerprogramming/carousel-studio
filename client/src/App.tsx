@@ -129,7 +129,8 @@ export default function App() {
     // the slide object rather than a separate callback.
     const bulk = [
       ['_applyBgToAll',        (s: Slide, c: Slide) => ({ ...s, bgColor: c.bgColor })],
-      ['_applyColorsToAll',    (s: Slide, c: Slide) => ({ ...s, bgColor: c.bgColor, textColor: c.textColor, accentColor: c.accentColor })],
+      // Themes can carry a layout variant, so that has to travel with the colours
+      ['_applyColorsToAll',    (s: Slide, c: Slide) => ({ ...s, bgColor: c.bgColor, textColor: c.textColor, accentColor: c.accentColor, variant: c.variant })],
       ['_applyTextScaleToAll', (s: Slide, c: Slide) => ({ ...s, textScale: c.textScale })],
     ] as const
 

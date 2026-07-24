@@ -16,7 +16,127 @@ function blend(fg: string, bg: string, f: number) {
   return `rgb(${Math.round(a.r*f+b2.r*(1-f))},${Math.round(a.g*f+b2.g*(1-f))},${Math.round(a.b*f+b2.b*(1-f))})`
 }
 
+/**
+ * Terminal variant.
+ *
+ * Dark, mono, with the detail carried by a terminal window rather than a body
+ * paragraph. Mirrored in generate_slide.py — change both together.
+ */
+function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps>) {
+  const ts = slide.textScale ?? 1
+  const s = (px: number) => Math.round(px * scale)
+  const sf = (px: number) => Math.round(px * scale * ts)
+
+  const BG = slide.bgColor || '#12141A'
+  const FG = slide.textColor || '#EEECE8'
+  const AC = slide.accentColor || '#E07355'
+  const DIM = 'rgba(238,236,232,0.45)'
+  const MONO = "'Menlo','SFMono-Regular',ui-monospace,monospace"
+
+  const W = s(1080), H = s(1350), PAD = s(84)
+  const lines = slide.terminalLines ?? []
+
+  return (
+    <div style={{
+      width: W, height: H, position: 'relative', overflow: 'hidden', flexShrink: 0,
+      background: BG, fontFamily: "'Inter', system-ui, sans-serif",
+    }}>
+      {/* top rail */}
+      <div style={{ position: 'absolute', top: s(74), left: PAD, right: PAD, display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ fontFamily: MONO, fontSize: s(26), color: DIM, letterSpacing: '0.08em' }}>
+          {(slide.emphasisLine && slide.type === 'cover') ? 'codewithtyler' : 'codewithtyler'}
+        </span>
+        <span style={{ fontFamily: MONO, fontSize: s(26), color: DIM, letterSpacing: '0.08em' }}>
+          {slide.type === 'cover' ? 'v1.0' : `${String(slide.slideNumber).padStart(2, '0')} / ${String(totalSlides).padStart(2, '0')}`}
+        </span>
+      </div>
+
+      {/* headline */}
+      <div style={{ position: 'absolute', top: s(200), left: PAD, right: PAD }}>
+        {slide.stepNumber != null && slide.type === 'content' && (
+          <div style={{
+            display: 'inline-block', background: AC, color: BG,
+            fontSize: sf(48), fontWeight: 900, lineHeight: 1,
+            padding: `${s(14)}px ${s(24)}px`, borderRadius: s(8), marginBottom: s(28),
+          }}>{slide.stepNumber}</div>
+        )}
+        {slide.headline && (
+          <div style={{
+            fontSize: sf(slide.type === 'cover' ? 118 : 108), fontWeight: 800,
+            lineHeight: 1.06, color: FG, letterSpacing: '-0.02em', marginBottom: s(20),
+          }}>{slide.headline}</div>
+        )}
+        {slide.emphasisLine && (
+          slide.type === 'cover' ? (
+            <span style={{
+              display: 'inline-block', background: AC, color: BG,
+              fontSize: sf(44), fontWeight: 700, padding: `${s(12)}px ${s(20)}px`, borderRadius: s(8),
+            }}>{slide.emphasisLine}</span>
+          ) : (
+            <div style={{ fontSize: sf(44), fontWeight: 600, color: AC }}>{slide.emphasisLine}</div>
+          )
+        )}
+      </div>
+
+      {/* terminal window */}
+      {lines.length > 0 && (
+        <div style={{
+          position: 'absolute', left: PAD, right: PAD, top: s(700),
+          background: '#0B0D12', borderRadius: s(16), overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,0.07)',
+        }}>
+          <div style={{
+            height: s(62), background: '#23272F', display: 'flex', alignItems: 'center',
+            paddingLeft: s(24), gap: s(10),
+          }}>
+            {['#FF5F56', '#FFBD2E', '#27C93F'].map((c) => (
+              <span key={c} style={{ width: s(15), height: s(15), borderRadius: '50%', background: c }} />
+            ))}
+            <span style={{ fontFamily: MONO, fontSize: s(24), color: DIM, marginLeft: s(20) }}>
+              {slide.terminalTitle ?? 'claude'}
+            </span>
+          </div>
+          <div style={{ padding: `${s(26)}px ${s(30)}px` }}>
+            {lines.map((ln, i) => {
+              const isCmd = ln.startsWith('$');
+              const isOk = ln.trimStart().startsWith('✓')
+              return (
+                <div key={i} style={{
+                  fontFamily: MONO, fontSize: sf(29), lineHeight: 1.9,
+                  color: isCmd ? FG : isOk ? '#6EDC8C' : DIM,
+                  whiteSpace: 'pre-wrap',
+                }}>{ln}</div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* body fallback when there is no terminal block */}
+      {lines.length === 0 && slide.bodyText && (
+        <div style={{
+          position: 'absolute', left: PAD, right: PAD, top: s(720),
+          fontFamily: MONO, fontSize: sf(32), lineHeight: 1.65, color: DIM,
+        }}>{slide.bodyText}</div>
+      )}
+
+      {/* footer */}
+      <div style={{ position: 'absolute', bottom: s(64), left: PAD, right: PAD, display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ fontFamily: MONO, fontSize: s(26), color: DIM }}>{slide.footerColor ? '' : ''}@tylerreedai</span>
+        {slide.slideNumber < totalSlides && (
+          <span style={{ fontFamily: MONO, fontSize: s(26), color: AC }}>swipe →</span>
+        )}
+      </div>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: s(8), background: AC }} />
+    </div>
+  )
+}
+
 export default function SlidePreview({ slide, scale = 1, totalSlides = 7 }: SlidePreviewProps) {
+  if (slide.variant === 'terminal') {
+    return <TerminalSlide slide={slide} scale={scale} totalSlides={totalSlides} />
+  }
+
   const ts    = slide.textScale ?? 1
   const s     = (px: number) => Math.round(px * scale)
   const sf    = (px: number) => Math.round(px * scale * ts)   // font-size scaled

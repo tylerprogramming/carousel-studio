@@ -1,10 +1,26 @@
 export type SlideType = 'cover' | 'content' | 'cta'
 
+/**
+ * Layout variant.
+ *
+ * 'default'  — cream editorial layout: big headline, emphasis, body
+ * 'terminal' — dark developer layout with a terminal window carrying the detail
+ *
+ * A variant changes the whole composition, not just colours, so it is
+ * implemented in both SlidePreview.tsx and generate_slide.py. Adding one means
+ * adding it in both places or exports stop matching the preview.
+ */
+export type SlideVariant = 'default' | 'terminal'
+
 export interface Slide {
   id: string
   type: SlideType
   slideNumber: number
   stepNumber?: number
+  variant?: SlideVariant     // default 'default'
+  /** Terminal variant: lines rendered inside the window. */
+  terminalTitle?: string     // window title bar text, e.g. "claude — skill install"
+  terminalLines?: string[]   // each line; a leading "$ " renders as a command, "✓ " as success
   headline: string
   emphasisLine: string
   bodyText: string

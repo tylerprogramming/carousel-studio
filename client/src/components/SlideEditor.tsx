@@ -179,7 +179,10 @@ export default function SlideEditor({ slide, onChange }: Props) {
           <ThemePicker
             slide={slide}
             onApply={(t, scope) => {
-              const colors = { bgColor: t.bgColor, textColor: t.textColor, accentColor: t.accentColor }
+              const colors = {
+                bgColor: t.bgColor, textColor: t.textColor, accentColor: t.accentColor,
+                variant: t.variant ?? 'default',
+              }
               onChange(
                 scope === 'all'
                   ? ({ ...slide, ...colors, _applyColorsToAll: true } as any)

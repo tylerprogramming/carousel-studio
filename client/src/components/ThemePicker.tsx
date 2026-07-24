@@ -16,6 +16,8 @@ export interface Theme {
   bgColor: string
   textColor: string
   accentColor: string
+  /** Some themes imply a layout, not just a palette. */
+  variant?: 'default' | 'terminal'
   builtin?: boolean
 }
 
@@ -25,6 +27,8 @@ const BUILTIN: Theme[] = [
   { id: 'midnight',name: 'Midnight',bgColor: '#1A1A2E', textColor: '#F5F0EB', accentColor: '#5BA4CF', builtin: true },
   { id: 'sand',    name: 'Sand',    bgColor: '#C9B99A', textColor: '#1B1B1B', accentColor: '#1B4332', builtin: true },
   { id: 'mono',    name: 'Mono',    bgColor: '#FFFFFF', textColor: '#1B1B1B', accentColor: '#1B1B1B', builtin: true },
+  // Terminal is a layout as well as a palette — see SlideVariant in types.ts
+  { id: 'terminal', name: 'Terminal', bgColor: '#12141A', textColor: '#EEECE8', accentColor: '#E07355', variant: 'terminal', builtin: true },
 ]
 
 const STORAGE_KEY = 'carousel_studio_themes'

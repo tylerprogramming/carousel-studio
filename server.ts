@@ -206,7 +206,22 @@ function parseJSON(text: string): { slides: any[]; title: string } {
 
 // JSON Schema the model's response is constrained to, so the reply is always
 // valid JSON in the right shape — no markdown fences to strip, no reshaping.
-function slidesSchema(slideCount: number) {
+function slidesSchema(slideCount: number, variant?: string) {
+  const terminal = variant === 'terminal'
+  const props: Record<string, any> = {
+    slideNumber:  { type: 'integer' },
+    headline:     { type: 'string', description: terminal ? '1-3 words, lowercase, like a CLI subcommand' : '3-6 words, punchy and bold' },
+    emphasisLine: { type: 'string', description: '5-12 words, the key insight or hook' },
+    bodyText:     { type: 'string', description: '1-3 sentences, practical and specific' },
+  }
+  if (terminal) {
+    props.terminalTitle = { type: 'string', description: 'Window title, e.g. "claude — skill install". Empty string on the cover and CTA slides.' }
+    props.terminalLines = {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Up to 5 lines of a realistic terminal session. "$ " prefixes the command, "  ✓ " prefixes results. Max 52 characters per line. Empty array on the cover and CTA slides.',
+    }
+  }
   return {
     type: 'object',
     properties: {
@@ -216,13 +231,8 @@ function slidesSchema(slideCount: number) {
         description: `Exactly ${slideCount} slides, one per slideNumber in order`,
         items: {
           type: 'object',
-          properties: {
-            slideNumber:  { type: 'integer' },
-            headline:     { type: 'string', description: '3-6 words, punchy and bold' },
-            emphasisLine: { type: 'string', description: '5-12 words, the key insight or hook' },
-            bodyText:     { type: 'string', description: '1-3 sentences, practical and specific' },
-          },
-          required: ['slideNumber', 'headline', 'emphasisLine', 'bodyText'],
+          properties: props,
+          required: Object.keys(props),
           additionalProperties: false,
         },
       },
@@ -280,7 +290,7 @@ Every slide needs real content written for its specific purpose — no placehold
       thinking: { type: 'adaptive' },
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
-      output_config: { format: { type: 'json_schema', schema: slidesSchema(framework.slideCount) } },
+      output_config: { format: { type: 'json_schema', schema: slidesSchema(framework.slideCount, framework.variant) } },
     })
     if (message.stop_reason === 'refusal') {
       throw new Error('Claude declined this topic. Try rewording it.')
@@ -300,7 +310,7 @@ Every slide needs real content written for its specific purpose — no placehold
         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
         response_format: {
           type: 'json_schema',
-          json_schema: { name: 'carousel', strict: true, schema: slidesSchema(framework.slideCount) },
+          json_schema: { name: 'carousel', strict: true, schema: slidesSchema(framework.slideCount, framework.variant) },
         },
       }),
     })
@@ -316,10 +326,24 @@ Every slide needs real content written for its specific purpose — no placehold
   const merged = framework.slides.map((fwSlide: any) => {
     const ai = aiByNum[fwSlide.slideNumber] ?? {}
     const { purpose, ...fw } = fwSlide
-    return { ...fw, headline: ai.headline || '', emphasisLine: ai.emphasisLine || '', bodyText: ai.bodyText || '', bgColor: '#F5F0EB', textColor: '#1B1B1B', accentColor: '#E07355' }
+    const base: any = {
+      ...fw,
+      headline: ai.headline || '', emphasisLine: ai.emphasisLine || '', bodyText: ai.bodyText || '',
+      bgColor: '#F5F0EB', textColor: '#1B1B1B', accentColor: '#E07355',
+    }
+    if (framework.variant === 'terminal') {
+      // Terminal frameworks bring their own palette and layout
+      Object.assign(base, {
+        variant: 'terminal',
+        bgColor: '#12141A', textColor: '#EEECE8', accentColor: '#E07355',
+        terminalTitle: ai.terminalTitle || undefined,
+        terminalLines: (ai.terminalLines || []).filter(Boolean),
+      })
+    }
+    return base
   })
   for (const s of merged) {
-    if (s.type === 'cta') { s.bgColor = '#1B4332'; s.textColor = '#F5F0EB'; s.accentColor = '#E07355' }
+    if (s.type === 'cta' && s.variant !== 'terminal') { s.bgColor = '#1B4332'; s.textColor = '#F5F0EB'; s.accentColor = '#E07355' }
   }
 
   return { slides: merged, title: title ?? topic }

@@ -1,0 +1,18 @@
+{
+  "id": "claude-skills",
+  "name": "Skill Drop",
+  "emoji": "⌘",
+  "description": "Terminal-style teardown of tools, skills, or commands — built for a comment gate",
+  "slideCount": 7,
+  "variant": "terminal",
+  "systemPrompt": "You write Instagram carousels for a developer who builds with Claude Code and ships real tools. The reader is technical: they want the actual command, the actual result, and what it saves them. Voice is blunt and concrete. No hype, no guru energy, no 'game changer'. Never invent benchmarks or numbers. Never use em dashes. Headlines are one or two words, lowercase, like a CLI subcommand. The emphasis line is the payoff in plain language. Terminal lines should read like a real session: a line starting with '$ ' is the command the user types, lines starting with '  ✓ ' are what it produced, and a final unmarked line can state the outcome or timing. Keep every terminal line under 52 characters so it fits the window.",
+  "slides": [
+    { "slideNumber": 1, "type": "cover",   "purpose": "Name the thing and the outcome. Headline is the topic in two or three lowercase words. Emphasis line is the concrete payoff, e.g. 'that replaced my whole workflow'. No terminal window on the cover." },
+    { "slideNumber": 2, "type": "content", "stepNumber": 1, "purpose": "The problem this solves, stated as the manual work it removes. Terminal shows the painful before-state or the first command." },
+    { "slideNumber": 3, "type": "content", "stepNumber": 2, "purpose": "The second tool or step. Show its install or invocation and what it returns." },
+    { "slideNumber": 4, "type": "content", "stepNumber": 3, "purpose": "The third tool or step. This should be the one most people do not know about." },
+    { "slideNumber": 5, "type": "content", "stepNumber": 4, "purpose": "The fourth tool or step. Prefer something that composes with the previous ones." },
+    { "slideNumber": 6, "type": "content", "stepNumber": 5, "purpose": "The fifth tool or step, or the way they combine into one workflow. Terminal shows the full chain." },
+    { "slideNumber": 7, "type": "cta",     "purpose": "The comment gate. Headline is 'comment' and the emphasis line is a single uppercase keyword in quotes. Body states exactly what gets DM'd and that it is free. One sentence, no hedging." }
+  ]
+}

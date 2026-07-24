@@ -209,7 +209,114 @@ def zoom_crop(img, box_w, box_h, zoom, pan_x, pan_y):
 
 # ── Renderer ──────────────────────────────────────────────────────────────────
 
+MONO_FONTS = ['/System/Library/Fonts/Menlo.ttc', '/System/Library/Fonts/Monaco.ttf']
+
+
+def load_mono(size: int) -> ImageFont.FreeTypeFont:
+    for p in MONO_FONTS:
+        if os.path.exists(p):
+            try:
+                return ImageFont.truetype(p, max(8, int(size)))
+            except Exception:
+                continue
+    return load_font(size, 400)
+
+
+def generate_terminal_slide(data):
+    """Terminal variant — the export-side twin of TerminalSlide in
+    SlidePreview.tsx. Change both together."""
+    bg = hex_to_rgb(data.get('bgColor') or '#12141A')
+    fg = hex_to_rgb(data.get('textColor') or '#EEECE8')
+    ac = hex_to_rgb(data.get('accentColor') or '#E07355')
+    dim = blend(fg, bg, 0.45)
+    slide_num = int(data.get('slideNumber', 1))
+    total = int(data.get('totalSlides', 7))
+    stype = data.get('type', 'content')
+    scale = float(data.get('textScale', 1.0) or 1.0)
+    out = data.get('output', '/tmp/slide.png')
+
+    def fs(px):
+        return max(8, round(px * scale))
+
+    PADX = 84
+    img = Image.new('RGB', (WIDTH, HEIGHT), bg)
+    d = ImageDraw.Draw(img)
+
+    d.rectangle([0, 0, WIDTH, 8], fill=ac)
+
+    rail = load_mono(26)
+    d.text((PADX, 74), 'codewithtyler', font=rail, fill=dim)
+    right = 'v1.0' if stype == 'cover' else f'{slide_num:02d} / {total:02d}'
+    d.text((WIDTH - PADX, 74), right, font=rail, fill=dim, anchor='rt')
+
+    y = 200
+    step = data.get('stepNumber')
+    if step is not None and stype == 'content':
+        f_step = load_font(fs(48), 900)
+        tw = d.textbbox((0, 0), str(step), font=f_step)[2]
+        d.rounded_rectangle([PADX, y, PADX + tw + 48, y + fs(48) + 28], radius=8, fill=ac)
+        d.text((PADX + 24, y + 14), str(step), font=f_step, fill=bg)
+        y += fs(48) + 28 + 28
+
+    headline = (data.get('headline') or '').strip()
+    if headline:
+        size = fs(118 if stype == 'cover' else 108)
+        f_h = load_font(size, 800)
+        for ln in wrap_text(d, headline, f_h, WIDTH - PADX * 2):
+            d.text((PADX, y), ln, font=f_h, fill=fg)
+            y += round(size * 1.06)
+        y += 20
+
+    emphasis = (data.get('emphasisLine') or '').strip()
+    if emphasis:
+        if stype == 'cover':
+            f_e = load_font(fs(44), 700)
+            tw = d.textbbox((0, 0), emphasis, font=f_e)[2]
+            d.rounded_rectangle([PADX, y, PADX + tw + 40, y + fs(44) + 24], radius=8, fill=ac)
+            d.text((PADX + 20, y + 12), emphasis, font=f_e, fill=bg)
+        else:
+            f_e = load_font(fs(44), 600)
+            d.text((PADX, y), emphasis, font=f_e, fill=ac)
+
+    lines = data.get('terminalLines') or []
+    if lines:
+        win_top = 700
+        f_line = load_mono(fs(29))
+        line_h = round(fs(29) * 1.9)
+        win_h = 62 + 26 * 2 + line_h * len(lines)
+        d.rounded_rectangle([PADX, win_top, WIDTH - PADX, win_top + win_h], radius=16, fill=(11, 13, 18))
+        d.rounded_rectangle([PADX, win_top, WIDTH - PADX, win_top + 62], radius=16, fill=(35, 39, 47))
+        d.rectangle([PADX, win_top + 40, WIDTH - PADX, win_top + 62], fill=(35, 39, 47))
+        for i, c in enumerate([(255, 95, 86), (255, 189, 46), (39, 201, 63)]):
+            cx = PADX + 24 + i * 25
+            d.ellipse([cx, win_top + 23, cx + 15, win_top + 38], fill=c)
+        d.text((PADX + 24 + 3 * 25 + 20, win_top + 18), data.get('terminalTitle') or 'claude',
+               font=load_mono(24), fill=dim)
+        ly = win_top + 62 + 26
+        for ln in lines:
+            col = fg if ln.startswith('$') else ((110, 220, 140) if ln.lstrip().startswith('✓') else dim)
+            d.text((PADX + 30, ly), ln, font=f_line, fill=col)
+            ly += line_h
+    elif (data.get('bodyText') or '').strip():
+        f_b = load_mono(fs(32))
+        by = 720
+        for ln in wrap_text(d, data['bodyText'].strip(), f_b, WIDTH - PADX * 2):
+            d.text((PADX, by), ln, font=f_b, fill=dim)
+            by += round(fs(32) * 1.65)
+
+    foot = load_mono(26)
+    d.text((PADX, HEIGHT - 64), '@tylerreedai', font=foot, fill=dim)
+    if slide_num < total:
+        d.text((WIDTH - PADX, HEIGHT - 64), 'swipe →', font=foot, fill=ac, anchor='rt')
+
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    img.save(out, 'PNG')
+    return out
+
+
 def generate_slide(data):
+    if data.get('variant') == 'terminal':
+        return generate_terminal_slide(data)
     bg_rgb = hex_to_rgb(data.get('bgColor', '#F5F0EB'))
     text_rgb = hex_to_rgb(data.get('textColor', '#1B1B1B'))
     accent_rgb = hex_to_rgb(data.get('accentColor', '#E07355'))
