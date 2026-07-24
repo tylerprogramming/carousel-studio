@@ -1,18 +1,9 @@
 import { useState, useRef } from 'react'
 import { Slide } from '../types'
 import ImageLibrary from './ImageLibrary'
+import { BG, BLUE, BLUE_HOVER, BLUE_LIGHT, BORDER, CORAL, MUTED, TEXT, WHITE } from '../lib/tokens'
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
-const BLUE       = '#5B6CF2'
-const BLUE_LIGHT = '#EEF0FD'
-const BLUE_HOVER = '#4A59E0'
-const TEXT       = '#1C1E2E'
-const MUTED      = '#8890A4'
-const BORDER     = '#E5EAF5'
-const BG         = '#F0F4FF'
-const WHITE      = '#FFFFFF'
-const CORAL      = '#E07355'
-
 type ImgScope = 'single' | 'all' | 'each'
 
 export interface BgImageCardProps {

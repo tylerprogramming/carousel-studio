@@ -18,6 +18,17 @@ export default {
         accent:     { DEFAULT: 'hsl(var(--accent))', foreground: 'hsl(var(--accent-foreground))' },
         card:       { DEFAULT: 'hsl(var(--card))', foreground: 'hsl(var(--card-foreground))' },
         coral: { DEFAULT: 'hsl(16 65% 61%)', light: 'hsl(16 65% 97%)', dark: 'hsl(16 65% 50%)' },
+        // App chrome. These were previously duplicated as raw hex constants in
+        // App.tsx, SlideList.tsx and half a dozen other components; the CSS
+        // variables in index.css are the single source of truth now.
+        brand: {
+          DEFAULT: 'var(--blue)',
+          light:   'var(--blue-light)',
+          hover:   'var(--blue-hover)',
+          dim:     'var(--blue-dim)',
+        },
+        batch:  { DEFAULT: '#7C3AED', light: '#F5F3FF', border: '#C4B5FD' },
+        tiktok: '#FE2C55',
       },
       borderRadius: {
         lg: 'var(--radius)', md: 'calc(var(--radius) - 2px)', sm: 'calc(var(--radius) - 4px)',

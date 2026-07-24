@@ -1,13 +1,5 @@
 import { useState, useEffect } from 'react'
-
-const BLUE       = '#5B6CF2'
-const BLUE_LIGHT = '#EEF0FD'
-const BLUE_HOVER = '#4A59E0'
-const TEXT       = '#1C1E2E'
-const MUTED      = '#8890A4'
-const BORDER     = '#E5EAF5'
-const BG         = '#F0F4FF'
-const WHITE      = '#FFFFFF'
+import { BG, BLUE, BLUE_HOVER, BLUE_LIGHT, BORDER, MUTED, TEXT, WHITE } from '../lib/tokens'
 
 interface CarouselMeta {
   id: string

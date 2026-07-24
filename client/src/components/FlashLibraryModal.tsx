@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react'
-
-const TIKTOK   = '#FE2C55'
-const TIKTOK_D = '#c4002c'
-const TEXT     = '#1C1E2E'
-const MUTED    = '#8890A4'
-const BORDER   = '#E5EAF5'
-const BG       = '#F0F4FF'
-const WHITE    = '#FFFFFF'
+import { BG, BORDER, MUTED, TEXT, TIKTOK, TIKTOK_D, WHITE } from '../lib/tokens'
 
 interface FlashEntry {
   id: string

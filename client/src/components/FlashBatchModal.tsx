@@ -1,14 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Slide } from '../types'
 import SlidePreview from './SlidePreview'
+import { BG, BORDER, MUTED, TEXT, TIKTOK, TIKTOK_D, WHITE } from '../lib/tokens'
 
-const TIKTOK   = '#FE2C55'
-const TIKTOK_D = '#c4002c'
-const TEXT     = '#1C1E2E'
-const MUTED    = '#8890A4'
-const BORDER   = '#E5EAF5'
-const BG       = '#F0F4FF'
-const WHITE    = '#FFFFFF'
 const GREEN    = '#16A34A'
 
 type FlashStyle = 'statement' | 'video' | 'terminal'
