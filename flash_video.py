@@ -369,7 +369,7 @@ def _draw_list_content(draw, cfg: dict, mode: str = "cream"):
     list_items = [sanitize(x) for x in cfg.get("listItems", [])]
     summary    = sanitize(cfg.get("summaryLine", ""))
     cta_text   = sanitize(cfg.get("ctaText", ""))
-    handle     = cfg.get("handle", "@codewithtyler")
+    handle     = cfg.get("handle", "")
 
     on_photo   = mode in ("photo", "rgba")
     alpha      = 255  # PIL ignores alpha for RGB; used for RGBA fills

@@ -9,15 +9,18 @@ POLL_URL       = f"{API_BASE}/jobs/recordInfo"
 UPLOAD_URL     = "https://kieai.redpandaai.co/api/file-base64-upload"
 
 def get_api_key():
+    """A .env in the project root is the normal case; ~/.claude/.env is also read
+    so the app works inside a Claude Code setup without duplicating keys."""
     key = os.environ.get("KIE_API_KEY")
-    if not key:
-        env = Path.home() / ".claude" / ".env"
-        if env.exists():
-            for line in env.read_text().splitlines():
-                if line.strip().startswith("KIE_API_KEY="):
-                    key = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    break
-    return key
+    if key:
+        return key
+    for env in (Path(__file__).parent / ".env", Path.home() / ".claude" / ".env"):
+        if not env.exists():
+            continue
+        for line in env.read_text().splitlines():
+            if line.strip().startswith("KIE_API_KEY="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return None
 
 def api_post(url, payload, api_key):
     data = json.dumps(payload).encode()
@@ -135,7 +138,7 @@ def download(url, output_path):
 def generate(prompt, output_path, reference_images=None):
     api_key = get_api_key()
     if not api_key:
-        raise RuntimeError("KIE_API_KEY not found in environment or ~/.claude/.env")
+        raise RuntimeError("KIE_API_KEY not found. Add it to .env in the project root.")
     print(f"Creating Kie.ai task...", flush=True)
     task_id   = create_task(prompt, api_key, reference_images=reference_images)
     print(f"Task {task_id} created — polling...", flush=True)

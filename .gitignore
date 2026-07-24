@@ -8,12 +8,14 @@ client/dist/
 # Generated files (user-specific, not part of the repo)
 output/
 carousels/
+exports/
 settings.json
 
 # Environment & secrets
 .env
 .env.local
 *.env
+!.env.example
 
 # macOS
 .DS_Store

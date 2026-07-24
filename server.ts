@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import { readFileSync, writeFileSync, unlinkSync, existsSync, mkdirSync, readdirSync } from 'fs'
-import { join } from 'path'
+import Anthropic from '@anthropic-ai/sdk'
+import { readFileSync, writeFileSync, unlinkSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs'
+import { join, resolve, sep } from 'path'
 import { homedir } from 'os'
 
 const app = new Hono()
@@ -10,11 +11,17 @@ app.use('*', cors())
 const OUTPUT_DIR           = join(import.meta.dir, 'output')
 const FRAMEWORKS_DIR        = join(import.meta.dir, 'frameworks')
 const CAROUSELS_DIR         = join(import.meta.dir, 'carousels')
-const CONTENT_CAROUSEL_DIR  = join(homedir(), 'content', 'carousel')
+// Where finished carousels land. Defaults to a folder inside the app so a fresh
+// clone works with no configuration; point it somewhere else (e.g. a content
+// repo) with CAROUSEL_EXPORT_DIR or `exportDir` in settings.json.
+function exportDir(): string {
+  const configured = process.env.CAROUSEL_EXPORT_DIR || readSettings().exportDir
+  if (!configured) return join(import.meta.dir, 'exports')
+  return configured.startsWith('~')
+    ? join(homedir(), configured.slice(1).replace(/^[/\\]/, ''))
+    : resolve(configured)
+}
 const SETTINGS_FILE         = join(import.meta.dir, 'settings.json')
-mkdirSync(OUTPUT_DIR,          { recursive: true })
-mkdirSync(CAROUSELS_DIR,       { recursive: true })
-mkdirSync(CONTENT_CAROUSEL_DIR, { recursive: true })
 
 function readSettings(): Record<string, any> {
   try { return JSON.parse(readFileSync(SETTINGS_FILE, 'utf8')) } catch { return {} }
@@ -23,21 +30,54 @@ function writeSettings(data: Record<string, any>) {
   writeFileSync(SETTINGS_FILE, JSON.stringify({ ...readSettings(), ...data }, null, 2))
 }
 
-// Load env from ~/.claude/.env
+/** Creator handle shown on CTA slides and in the platform preview mockups. */
+function creatorHandle(): string {
+  const h = (readSettings().handle || '@yourhandle').trim()
+  return h.startsWith('@') ? h : `@${h}`
+}
+
+mkdirSync(OUTPUT_DIR,    { recursive: true })
+mkdirSync(CAROUSELS_DIR, { recursive: true })
+
+// Resolve a client-side media URL to an absolute path on disk.
+// Accepts '/files/<name>' (generated output) and '/carousel-output/<slug>/<name>'
+// (exported carousels). Returns null for anything else, or for any path that
+// escapes its base directory.
+function resolveMediaPath(url: string | undefined): string | null {
+  if (!url) return null
+  let base: string
+  let rel: string
+  if (url.startsWith('/files/')) {
+    base = OUTPUT_DIR
+    rel  = url.slice('/files/'.length)
+  } else if (url.startsWith('/carousel-output/')) {
+    base = exportDir()
+    rel  = url.slice('/carousel-output/'.length)
+  } else {
+    return null
+  }
+  const resolved = resolve(base, decodeURIComponent(rel))
+  if (resolved !== base && !resolved.startsWith(base + sep)) return null
+  return existsSync(resolved) ? resolved : null
+}
+
+// Load API keys. A .env in the project root is the normal case; ~/.claude/.env
+// is also read so the app works inside a Claude Code setup without duplicating
+// keys. Real environment variables always win over both.
 function loadEnv() {
-  const envPath = join(homedir(), '.claude', '.env')
-  try {
-    const content = readFileSync(envPath, 'utf8')
-    for (const line of content.split('\n')) {
-      const t = line.trim()
-      if (!t || t.startsWith('#')) continue
-      const eq = t.indexOf('=')
-      if (eq === -1) continue
-      const key = t.slice(0, eq).trim()
-      const val = t.slice(eq + 1).trim()
-      if (!process.env[key]) process.env[key] = val
-    }
-  } catch { /* ignore */ }
+  for (const envPath of [join(import.meta.dir, '.env'), join(homedir(), '.claude', '.env')]) {
+    try {
+      for (const line of readFileSync(envPath, 'utf8').split('\n')) {
+        const t = line.trim()
+        if (!t || t.startsWith('#')) continue
+        const eq = t.indexOf('=')
+        if (eq === -1) continue
+        const key = t.slice(0, eq).trim()
+        const val = t.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
+        if (!process.env[key]) process.env[key] = val
+      }
+    } catch { /* file absent — fine */ }
+  }
 }
 loadEnv()
 
@@ -262,7 +302,7 @@ app.post('/api/generate-bg-image', async (c) => {
   const finalPrompt = prompt ? `${prompt}${likenessHint}` : prompt
 
   if (!process.env.KIE_API_KEY) {
-    return c.json({ error: 'KIE_API_KEY not set in ~/.claude/.env' }, 400)
+    return c.json({ error: 'KIE_API_KEY not set. Add it to .env in the project root.' }, 400)
   }
 
   const bgScript = join(import.meta.dir, 'generate_bg_image.py')
@@ -437,7 +477,7 @@ app.post('/api/flash-video', async (c) => {
     ctaText: body.ctaText || '',
     listItems: body.listItems || [],
     summaryLine: body.summaryLine || '',
-    handle: body.handle || '@tylerai_dev',
+    handle: body.handle || creatorHandle(),
     bgColor: body.bgColor || '#F5F0EB',
     textColor: body.textColor || '#1B1B1B',
     accentColor: body.accentColor || '#E07355',
