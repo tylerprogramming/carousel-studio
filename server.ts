@@ -204,6 +204,34 @@ function parseJSON(text: string): { slides: any[]; title: string } {
   }
 }
 
+// JSON Schema the model's response is constrained to, so the reply is always
+// valid JSON in the right shape — no markdown fences to strip, no reshaping.
+function slidesSchema(slideCount: number) {
+  return {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: '3-5 word carousel title' },
+      slides: {
+        type: 'array',
+        description: `Exactly ${slideCount} slides, one per slideNumber in order`,
+        items: {
+          type: 'object',
+          properties: {
+            slideNumber:  { type: 'integer' },
+            headline:     { type: 'string', description: '3-6 words, punchy and bold' },
+            emphasisLine: { type: 'string', description: '5-12 words, the key insight or hook' },
+            bodyText:     { type: 'string', description: '1-3 sentences, practical and specific' },
+          },
+          required: ['slideNumber', 'headline', 'emphasisLine', 'bodyText'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['title', 'slides'],
+    additionalProperties: false,
+  }
+}
+
 // Shared AI generation logic used by both /api/ai-generate and /api/bulk-generate
 async function generateSlides(topic: string, frameworkId: string, platform = 'instagram', handle = ''): Promise<{ slides: any[]; title: string }> {
   loadEnv()
@@ -216,32 +244,28 @@ async function generateSlides(topic: string, frameworkId: string, platform = 'in
   if (!anthropicKey && !openaiKey) throw new Error('No AI API key found')
 
   const handleLine = handle ? `Creator handle: ${handle} — use it on the CTA slide.` : ''
-  const slideTemplate = framework.slides.map((s: any) => {
-    const base: any = { slideNumber: s.slideNumber, type: s.type, purpose: s.purpose, headline: '', emphasisLine: '', bodyText: '' }
-    if (s.stepNumber !== undefined) base.stepNumber = s.stepNumber
-    return base
-  })
+  // Each slide's purpose comes from the framework and tells the model what job
+  // that slide does in the arc. The output shape is enforced by the schema, so
+  // the prompt only has to cover intent and voice.
+  const slidePurposes = framework.slides
+    .map((s: any) => `${s.slideNumber}. (${s.type}) ${s.purpose}`)
+    .join('\n')
 
   const userPrompt = `Topic: "${topic}"
 Platform: ${platform}
 Framework: ${framework.name} — ${framework.description}
 ${handleLine}
 
-You MUST write content for EVERY slide below. Fill in headline, emphasisLine, and bodyText for all ${framework.slideCount} slides. Do not leave any empty.
+Write all ${framework.slideCount} slides. Each one below lists its slideNumber, type, and the job it does:
 
-Rules:
+${slidePurposes}
+
+Per slide:
 - headline: 3-6 words, punchy and bold
 - emphasisLine: 5-12 words, the key insight or hook for this slide
 - bodyText: 1-3 sentences, practical and specific, no filler
-- Every slide must have real content — no placeholders, no empty strings
 
-Return ONLY valid JSON. No markdown fences. No explanation. Just the JSON object:
-{
-  "title": "3-5 word carousel title",
-  "slides": ${JSON.stringify(slideTemplate, null, 2)}
-}
-
-Now fill in the headline, emphasisLine, and bodyText for each slide based on the purpose field. Return the completed JSON.`
+Every slide needs real content written for its specific purpose — no placeholders, no empty strings, no repeating the same point across slides.`
 
   const systemPrompt = framework.systemPrompt
 
@@ -249,20 +273,36 @@ Now fill in the headline, emphasisLine, and bodyText for each slide based on the
   let title: string
 
   if (anthropicKey) {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4096, system: systemPrompt, messages: [{ role: 'user', content: userPrompt }] }),
+    const anthropic = new Anthropic({ apiKey: anthropicKey })
+    const message = await anthropic.messages.create({
+      model: 'claude-opus-5',
+      max_tokens: 16000,
+      thinking: { type: 'adaptive' },
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+      output_config: { format: { type: 'json_schema', schema: slidesSchema(framework.slideCount) } },
     })
-    if (!res.ok) throw new Error(`Anthropic API error ${res.status}: ${await res.text()}`)
-    const data = await res.json() as any
-    const parsed = parseJSON(data.content?.[0]?.text ?? '')
+    if (message.stop_reason === 'refusal') {
+      throw new Error('Claude declined this topic. Try rewording it.')
+    }
+    // output_config.format guarantees the first text block is valid JSON
+    const text = message.content.find((b) => b.type === 'text')?.text ?? '{}'
+    const parsed = parseJSON(text)
     slides = parsed.slides; title = parsed.title
   } else {
+    // Fallback path. Uses the same JSON Schema as the Claude path via OpenAI's
+    // structured outputs, so both providers return an identically shaped reply.
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], response_format: { type: 'json_object' } }),
+      body: JSON.stringify({
+        model: 'gpt-5-mini',
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'carousel', strict: true, schema: slidesSchema(framework.slideCount) },
+        },
+      }),
     })
     if (!res.ok) throw new Error(`OpenAI API error ${res.status}: ${await res.text()}`)
     const data = await res.json() as any
@@ -284,6 +324,109 @@ Now fill in the headline, emphasisLine, and bodyText for each slide based on the
 
   return { slides: merged, title: title ?? topic }
 }
+
+// ── Caption Generation ────────────────────────────────────────────────────────
+
+// POST /api/captions
+// body: { title, platform, slides, slug?, save? }
+// Writes captions.md next to the exported slides when `save` is set.
+app.post('/api/captions', async (c) => {
+  const { title, platform = 'instagram', slides = [], slug, save } = await c.req.json()
+  if (!Array.isArray(slides) || slides.length === 0) return c.json({ error: 'slides are required' }, 400)
+
+  loadEnv()
+  const anthropicKey = process.env.ANTHROPIC_API_KEY
+  const openaiKey    = process.env.OPENAI_API_KEY
+  if (!anthropicKey && !openaiKey) return c.json({ error: 'No AI API key found' }, 400)
+
+  const outline = slides
+    .map((s: any) => `${s.slideNumber}. ${s.headline} — ${s.emphasisLine}. ${s.bodyText}`)
+    .join('\n')
+
+  // `brandVoice` in settings.json lets each user describe their own voice; the
+  // baseline below is deliberately generic so a fresh install writes decent
+  // captions with no configuration.
+  const brandVoice = (readSettings().brandVoice || '').trim()
+  const system = [
+    'You write social captions for a creator posting an educational carousel.',
+    'Voice: direct and concrete. Short sentences. Write to one person, not an audience.',
+    'Hard rules: never use em dashes. Never invent statistics, results, or testimonials.',
+    'Never open with filler like "In today\'s world" or "Let\'s be honest".',
+    brandVoice && `Additional voice guidance from the creator: ${brandVoice}`,
+  ].filter(Boolean).join(' ')
+
+  const prompt = `Carousel title: "${title}"
+Primary platform: ${platform}
+
+Slides:
+${outline}
+
+Write captions for this carousel.`
+
+  const schema = {
+    type: 'object',
+    properties: {
+      instagram: { type: 'string', description: 'Instagram caption. Hook on line one, then value, then a soft CTA. No hashtags in this field.' },
+      hashtags:  { type: 'array', items: { type: 'string' }, description: 'Exactly 5 Instagram hashtags, each starting with #' },
+      linkedin:  { type: 'string', description: 'LinkedIn caption. Slightly longer and more professional. No hashtags at all.' },
+    },
+    required: ['instagram', 'hashtags', 'linkedin'],
+    additionalProperties: false,
+  }
+
+  try {
+    let parsed: { instagram: string; hashtags: string[]; linkedin: string }
+
+    if (anthropicKey) {
+      const anthropic = new Anthropic({ apiKey: anthropicKey })
+      const message = await anthropic.messages.create({
+        model: 'claude-opus-5',
+        max_tokens: 8000,
+        thinking: { type: 'adaptive' },
+        system,
+        messages: [{ role: 'user', content: prompt }],
+        output_config: { format: { type: 'json_schema', schema } },
+      })
+      if (message.stop_reason === 'refusal') throw new Error('Claude declined this topic.')
+      parsed = JSON.parse(message.content.find((b) => b.type === 'text')?.text ?? '{}')
+    } else {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gpt-5-mini',
+          messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
+          response_format: { type: 'json_schema', json_schema: { name: 'captions', strict: true, schema } },
+        }),
+      })
+      if (!res.ok) throw new Error(`OpenAI API error ${res.status}: ${await res.text()}`)
+      const data = await res.json() as any
+      parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}')
+    }
+
+    // Strip em dashes defensively — a standing rule for this creator's content
+    const clean = (s: string) => (s || '').replace(/\s*—\s*/g, ' ')
+    const captions = {
+      instagram: clean(parsed.instagram),
+      hashtags:  (parsed.hashtags ?? []).map((h) => (h.startsWith('#') ? h : `#${h}`)),
+      linkedin:  clean(parsed.linkedin),
+    }
+
+    let savedTo: string | null = null
+    if (save && slug) {
+      const dir = join(exportDir(), slug)
+      mkdirSync(dir, { recursive: true })
+      const md = `# ${title}\n\n## Instagram\n\n${captions.instagram}\n\n${captions.hashtags.join(' ')}\n\n## LinkedIn\n\n${captions.linkedin}\n`
+      const path = join(dir, 'captions.md')
+      writeFileSync(path, md)
+      savedTo = path
+    }
+
+    return c.json({ ...captions, savedTo })
+  } catch (err) {
+    return c.json({ error: String(err) }, 500)
+  }
+})
 
 // ── Background Image Generation ───────────────────────────────────────────────
 
