@@ -457,24 +457,28 @@ app.post('/api/generate-bg-image', async (c) => {
 
       try {
         if (scope === 'each' && slides.length > 0) {
-          // Generate one image per slide using auto-prompts from slide content
+          // One image per slide, generated concurrently — a 7-slide set used to be
+          // 7 serial Kie.ai round trips. Results stream back as each one lands, so
+          // they may arrive out of slide order; every event carries its slideNumber.
           for (const slide of slides) {
+            send({ type: 'progress', slideNumber: slide.slideNumber, message: `Generating slide ${slide.slideNumber}...` })
+          }
+
+          await Promise.all(slides.map(async (slide: any) => {
             const autoPrompt = buildAutoPrompt(slide, finalPrompt)
             const filename   = `${outputPrefix}_slide${slide.slideNumber}.png`
             const outputPath = join(OUTPUT_DIR, filename)
             const payload    = JSON.stringify({ prompt: autoPrompt, output: outputPath, referenceImages: refs })
-
-            send({ type: 'progress', slideNumber: slide.slideNumber, message: `Generating slide ${slide.slideNumber}...` })
 
             const proc      = Bun.spawn(['python3', bgScript, payload], { stdout: 'pipe', stderr: 'pipe' })
             const exitCode  = await proc.exited
             if (exitCode !== 0) {
               const stderr = await new Response(proc.stderr).text()
               send({ type: 'error', slideNumber: slide.slideNumber, message: stderr })
-              continue
+              return
             }
             send({ type: 'image', slideNumber: slide.slideNumber, url: `/files/${filename}`, filename })
-          }
+          }))
           send({ type: 'complete' })
 
         } else {
@@ -539,33 +543,54 @@ app.post('/api/generate-slide', async (c) => {
   return c.json({ url: `/files/${filename}`, filename })
 })
 
-// Export all slides as PNG, PDF, or both → ~/content/carousel/<slug>/
+// Export all slides as PNG, PDF, or both → <exportDir>/<slug>/
 app.post('/api/export-all', async (c) => {
   const { slides, carouselSlug, format = 'png' } = await c.req.json()
   // format: 'png' | 'pdf' | 'both'
   const slug    = carouselSlug || `carousel_${Date.now()}`
-  const slugDir = join(CONTENT_CAROUSEL_DIR, slug)
+  const slugDir = join(exportDir(), slug)
   mkdirSync(slugDir, { recursive: true })
   const scriptPath = join(import.meta.dir, 'generate_slide.py')
 
-  // Step 1: always generate PNGs
-  const pngPaths: string[] = []
-  const pngResults: { slideNumber: number; url: string; filename: string }[] = []
-
-  for (const slide of slides) {
+  // Step 1: always generate PNGs — rendered in parallel, one python process per slide
+  type Render = { slide: any; filename: string; outputPath: string; payload: string }
+  const renders: Render[] = slides.map((slide: any) => {
     const filename   = `slide_${slide.slideNumber}.png`
     const outputPath = join(slugDir, filename)
-    const payload    = JSON.stringify({ ...slide, output: outputPath })
+    // Media URLs are resolved to absolute paths here, on the server, which owns
+    // OUTPUT_DIR — the client has no business knowing where that lives on disk.
+    const payload = JSON.stringify({
+      ...slide,
+      totalSlides:        slides.length,
+      backgroundImagePath: resolveMediaPath(slide.backgroundImage) ?? undefined,
+      backgroundVideoPath: resolveMediaPath(slide.backgroundVideo) ?? undefined,
+      insetImagePath:      resolveMediaPath(slide.insetImageUrl) ?? undefined,
+      output: outputPath,
+    })
+    return { slide, filename, outputPath, payload }
+  })
 
-    const proc = Bun.spawn(['python3', scriptPath, payload], { stdout: 'pipe', stderr: 'pipe' })
+  const outcomes = await Promise.all(renders.map(async ({ slide, payload }) => {
+    const proc     = Bun.spawn(['python3', scriptPath, payload], { stdout: 'pipe', stderr: 'pipe' })
     const exitCode = await proc.exited
     if (exitCode !== 0) {
-      const stderr = await new Response(proc.stderr).text()
-      return c.json({ error: `Slide ${slide.slideNumber} failed: ${stderr}` }, 500)
+      return { ok: false as const, slideNumber: slide.slideNumber, stderr: await new Response(proc.stderr).text() }
     }
-    pngPaths.push(outputPath)
-    pngResults.push({ slideNumber: slide.slideNumber, url: `/carousel-output/${slug}/${filename}`, filename })
+    return { ok: true as const }
+  }))
+
+  const failed = outcomes.find((o) => !o.ok)
+  if (failed && !failed.ok) {
+    return c.json({ error: `Slide ${failed.slideNumber} failed: ${failed.stderr}` }, 500)
   }
+
+  // Keep slide order stable for the PDF regardless of which render finished first
+  const pngPaths   = renders.map((r) => r.outputPath)
+  const pngResults = renders.map((r) => ({
+    slideNumber: r.slide.slideNumber,
+    url:         `/carousel-output/${slug}/${r.filename}`,
+    filename:    r.filename,
+  }))
 
   // Step 2: generate PDF if requested
   let pdfResult: { url: string; filename: string } | null = null
@@ -677,11 +702,11 @@ app.delete('/api/images/:filename', (c) => {
 
 // ── Static file serving ───────────────────────────────────────────────────────
 
-// Serve exported carousel output from ~/content/carousel/<slug>/
+// Serve exported carousel output from <exportDir>/<slug>/
 app.get('/carousel-output/:slug/:filename', async (c) => {
   const { slug, filename } = c.req.param()
-  const filePath = join(CONTENT_CAROUSEL_DIR, slug, filename)
-  if (!existsSync(filePath)) return c.text('Not found', 404)
+  const filePath = resolveMediaPath(`/carousel-output/${slug}/${filename}`)
+  if (!filePath) return c.text('Not found', 404)
   const file = Bun.file(filePath)
   const contentType = filename.endsWith('.pdf') ? 'application/pdf' : 'image/png'
   const disposition = filename.endsWith('.pdf') ? `attachment; filename="${filename}"` : 'inline'
@@ -692,8 +717,8 @@ app.get('/carousel-output/:slug/:filename', async (c) => {
 
 app.get('/files/:filename', async (c) => {
   const filename = c.req.param('filename')
-  const filePath = join(OUTPUT_DIR, filename)
-  if (!existsSync(filePath)) return c.text('Not found', 404)
+  const filePath = resolveMediaPath(`/files/${filename}`)
+  if (!filePath) return c.text('Not found', 404)
   const file = Bun.file(filePath)
   const contentType = filename.endsWith('.pdf') ? 'application/pdf'
     : filename.endsWith('.mp4') ? 'video/mp4'
@@ -705,11 +730,45 @@ app.get('/files/:filename', async (c) => {
   })
 })
 
+// Serve the built client. Static assets must be matched before the SPA
+// fallback, otherwise every /assets/*.js request is answered with index.html
+// and the built app loads a blank page.
+const DIST_DIR = join(import.meta.dir, 'client', 'dist')
+
+// Browsers refuse to execute a type="module" script served without a JavaScript
+// MIME type, so serving assets with no Content-Type breaks the built app.
+const MIME: Record<string, string> = {
+  '.js':   'text/javascript',
+  '.mjs':  'text/javascript',
+  '.css':  'text/css',
+  '.html': 'text/html',
+  '.json': 'application/json',
+  '.svg':  'image/svg+xml',
+  '.png':  'image/png',
+  '.jpg':  'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.ico':  'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2':'font/woff2',
+  '.ttf':  'font/ttf',
+  '.map':  'application/json',
+}
+
 app.get('*', async (c) => {
-  const distPath = join(import.meta.dir, 'client', 'dist', 'index.html')
-  if (existsSync(distPath)) return new Response(Bun.file(distPath))
-  return c.text('Run `bun run client` for the dev server', 200)
+  const indexPath = join(DIST_DIR, 'index.html')
+  if (!existsSync(indexPath)) return c.text('Run `bun run client` for the dev server', 200)
+
+  const urlPath = new URL(c.req.url).pathname
+  const asset   = resolve(DIST_DIR, '.' + urlPath)
+  if ((asset === DIST_DIR || asset.startsWith(DIST_DIR + sep)) && existsSync(asset) && statSync(asset).isFile()) {
+    const ext  = asset.slice(asset.lastIndexOf('.')).toLowerCase()
+    const type = MIME[ext]
+    return new Response(Bun.file(asset), type ? { headers: { 'Content-Type': type } } : undefined)
+  }
+  // Unknown path → hand back index.html so client-side routing works
+  return new Response(Bun.file(indexPath), { headers: { 'Content-Type': 'text/html' } })
 })
 
-console.log('🎨 Carousel Maker server running on http://localhost:3010')
+console.log('🎨 Carousel Studio server running on http://localhost:3010')
 export default { port: 3010, fetch: app.fetch }
