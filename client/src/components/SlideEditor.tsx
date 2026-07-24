@@ -4,6 +4,7 @@ import { Input } from './ui/input'
 import { Textarea } from './ui/textarea'
 import { Label } from './ui/label'
 import { Separator } from './ui/separator'
+import ThemePicker from './ThemePicker'
 import { cn } from '../lib/utils'
 
 interface Props {
@@ -173,6 +174,20 @@ export default function SlideEditor({ slide, onChange }: Props) {
         </FieldSection>
 
         <Separator className="my-4" />
+
+        <FieldSection title="Theme">
+          <ThemePicker
+            slide={slide}
+            onApply={(t, scope) => {
+              const colors = { bgColor: t.bgColor, textColor: t.textColor, accentColor: t.accentColor }
+              onChange(
+                scope === 'all'
+                  ? ({ ...slide, ...colors, _applyColorsToAll: true } as any)
+                  : { ...slide, ...colors },
+              )
+            }}
+          />
+        </FieldSection>
 
         <FieldSection title="Background Colour">
           <div className="flex flex-wrap gap-1.5 items-center">

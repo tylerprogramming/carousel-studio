@@ -1,12 +1,8 @@
+import { useState } from 'react'
 import { Slide } from '../types'
 import SlidePreview from './SlidePreview'
-
-const BLUE      = '#5B6CF2'
-const BLUE_LIGHT = '#EEF0FD'
-const TEXT      = '#1C1E2E'
-const MUTED     = '#8890A4'
-const BORDER    = '#E5EAF5'
-const BG        = '#F0F4FF'
+import { CopyIcon, GripIcon } from './icons'
+import { cn } from '../lib/utils'
 
 interface Props {
   slides: Slide[]
@@ -15,118 +11,103 @@ interface Props {
   onAdd: () => void
   onRemove: (i: number) => void
   onReorder: (from: number, to: number) => void
+  onDuplicate: (i: number) => void
 }
 
-export default function SlideList({ slides, activeIndex, onSelect, onAdd, onRemove }: Props) {
-  const THUMB_W = 148
-  const THUMB_H = Math.round(THUMB_W * 1350 / 1080)
-  const scale   = THUMB_W / 1080
+const THUMB_W = 148
+const THUMB_H = Math.round((THUMB_W * 1350) / 1080)
+
+export default function SlideList({
+  slides, activeIndex, onSelect, onAdd, onRemove, onReorder, onDuplicate,
+}: Props) {
+  // Drag-to-reorder. `dragIndex` is the slide being carried, `overIndex` the
+  // drop target — kept separate so the placeholder can render before the drop.
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [overIndex, setOverIndex] = useState<number | null>(null)
+
+  function handleDrop(to: number) {
+    if (dragIndex !== null && dragIndex !== to) onReorder(dragIndex, to)
+    setDragIndex(null)
+    setOverIndex(null)
+  }
 
   return (
-    <div style={{
-      width: 184, minWidth: 184, flexShrink: 0,
-      background: '#FFFFFF',
-      borderRight: `1px solid ${BORDER}`,
-      display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: '13px 14px 10px',
-        borderBottom: `1px solid ${BORDER}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <span style={{
-          fontSize: 11, fontWeight: 700, color: MUTED,
-          textTransform: 'uppercase', letterSpacing: '0.08em',
-        }}>
+    <div className="flex w-[184px] min-w-[184px] shrink-0 flex-col overflow-hidden border-r border-border bg-card">
+      <div className="flex items-center justify-between border-b border-border px-3.5 pb-2.5 pt-3">
+        <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
           Slides
         </span>
-        <span style={{
-          fontSize: 11, fontWeight: 600,
-          background: BLUE_LIGHT, color: BLUE,
-          borderRadius: 20, padding: '1px 7px',
-        }}>
+        <span className="rounded-full bg-brand-light px-[7px] py-px text-[11px] font-semibold text-brand">
           {slides.length}
         </span>
       </div>
 
-      {/* Thumbnails */}
-      <div style={{
-        flex: 1, overflowY: 'auto', padding: '10px 10px',
-        display: 'flex', flexDirection: 'column', gap: 8,
-      }}>
+      <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2.5">
         {slides.map((slide, i) => (
           <div
             key={slide.id}
+            draggable
+            onDragStart={() => setDragIndex(i)}
+            onDragEnd={() => { setDragIndex(null); setOverIndex(null) }}
+            onDragOver={(e) => { e.preventDefault(); setOverIndex(i) }}
+            onDrop={(e) => { e.preventDefault(); handleDrop(i) }}
             onClick={() => onSelect(i)}
-            style={{
-              borderRadius: 9, overflow: 'hidden', cursor: 'pointer', position: 'relative',
-              border: `2px solid ${i === activeIndex ? BLUE : BORDER}`,
-              transition: 'border-color 0.15s, box-shadow 0.15s',
-              width: THUMB_W, height: THUMB_H, flexShrink: 0,
-              boxShadow: i === activeIndex
-                ? `0 0 0 3px ${BLUE_LIGHT}, 0 2px 8px rgba(91,108,242,0.15)`
-                : '0 1px 3px rgba(30,40,100,0.06)',
-            }}
-            onMouseEnter={(e) => { if (i !== activeIndex) (e.currentTarget as HTMLElement).style.borderColor = '#C7CFFB' }}
-            onMouseLeave={(e) => { if (i !== activeIndex) (e.currentTarget as HTMLElement).style.borderColor = BORDER }}
+            style={{ width: THUMB_W, height: THUMB_H }}
+            className={cn(
+              'group relative shrink-0 cursor-pointer overflow-hidden rounded-[9px] border-2 transition-all',
+              i === activeIndex
+                ? 'border-brand shadow-[0_0_0_3px_var(--blue-light),0_2px_8px_var(--blue-dim)]'
+                : 'border-border shadow-card hover:border-brand/40',
+              dragIndex === i && 'opacity-40',
+              overIndex === i && dragIndex !== null && dragIndex !== i && 'border-brand border-dashed',
+            )}
           >
-            <SlidePreview slide={slide} scale={scale} totalSlides={slides.length} />
+            <SlidePreview slide={slide} scale={THUMB_W / 1080} totalSlides={slides.length} />
 
-            {/* Slide number badge */}
-            <div style={{
-              position: 'absolute', bottom: 4, right: 4,
-              background: i === activeIndex ? BLUE : 'rgba(0,0,0,0.45)',
-              color: '#fff', borderRadius: 5, padding: '1px 6px',
-              fontSize: 9, fontWeight: 700, transition: 'background 0.15s',
-            }}>
+            {/* Drag handle — visible on hover so the thumbnail stays clean */}
+            <div className="absolute left-1 top-1 flex h-[18px] w-[18px] cursor-grab items-center justify-center rounded bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing">
+              <GripIcon />
+            </div>
+
+            <div
+              className={cn(
+                'absolute bottom-1 right-1 rounded px-1.5 py-px text-[9px] font-bold text-white transition-colors',
+                i === activeIndex ? 'bg-brand' : 'bg-black/45',
+              )}
+            >
               {i + 1}
             </div>
 
-            {/* Remove button */}
-            {slides.length > 1 && (
+            <div className="absolute right-1 top-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
               <button
-                onClick={(e) => { e.stopPropagation(); onRemove(i) }}
-                className="thumb-remove"
-                style={{
-                  position: 'absolute', top: 4, right: 4,
-                  width: 18, height: 18, borderRadius: '50%',
-                  background: 'rgba(220,38,38,0.85)', border: 'none', color: '#fff',
-                  cursor: 'pointer', fontSize: 11, lineHeight: 1, opacity: 0,
-                  transition: 'opacity 0.15s',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >×</button>
-            )}
+                title="Duplicate slide"
+                onClick={(e) => { e.stopPropagation(); onDuplicate(i) }}
+                className="flex h-[18px] w-[18px] items-center justify-center rounded-full border-none bg-black/55 text-white hover:bg-black/75"
+              >
+                <CopyIcon size={10} />
+              </button>
+              {slides.length > 1 && (
+                <button
+                  title="Delete slide"
+                  onClick={(e) => { e.stopPropagation(); onRemove(i) }}
+                  className="flex h-[18px] w-[18px] items-center justify-center rounded-full border-none bg-destructive/85 text-[11px] leading-none text-white hover:bg-destructive"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Add button */}
-      <div style={{ padding: '10px', borderTop: `1px solid ${BORDER}` }}>
+      <div className="border-t border-border p-2.5">
         <button
           onClick={onAdd}
-          style={{
-            width: '100%', padding: '8px 0',
-            background: BG, border: `1.5px dashed ${BORDER}`,
-            borderRadius: 9, color: MUTED,
-            cursor: 'pointer', fontSize: 20, transition: 'all 0.15s',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.borderColor = BLUE
-            ;(e.currentTarget as HTMLElement).style.color = BLUE
-            ;(e.currentTarget as HTMLElement).style.background = BLUE_LIGHT
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.borderColor = BORDER
-            ;(e.currentTarget as HTMLElement).style.color = MUTED
-            ;(e.currentTarget as HTMLElement).style.background = BG
-          }}
-        >+</button>
+          className="flex w-full items-center justify-center rounded-[9px] border-[1.5px] border-dashed border-border bg-secondary py-2 text-xl text-muted-foreground transition-all hover:border-brand hover:bg-brand-light hover:text-brand"
+        >
+          +
+        </button>
       </div>
-
-      <style>{`.thumb-remove { opacity: 0 !important; } div:hover > .thumb-remove { opacity: 1 !important; }`}</style>
     </div>
   )
 }
