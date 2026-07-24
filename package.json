@@ -1,13 +1,20 @@
 {
-  "name": "carousel-maker",
-  "version": "1.0.0",
+  "name": "carousel-studio",
+  "version": "1.2.0",
   "scripts": {
     "dev": "concurrently \"bun run server\" \"bun run client\"",
     "server": "bun --watch server.ts",
-    "client": "cd client && bun run dev"
+    "client": "cd client && bun run dev",
+    "build": "cd client && bun run build",
+    "start": "bun server.ts",
+    "typecheck": "tsc --noEmit && cd client && tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^4.7.0",
-    "concurrently": "^9.0.0"
+    "@anthropic-ai/sdk": "^0.115.0",
+    "concurrently": "^9.0.0",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14"
   }
 }
