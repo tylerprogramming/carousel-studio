@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { Slide } from '../types'
 import SlidePreview from './SlidePreview'
+import { useSettings } from '../hooks/useSettings'
 
 interface Props {
   slides: Slide[]
@@ -87,6 +88,7 @@ function CarouselStrip({ slides, activeIndex, onMouseDown, onMouseUp, width = PH
 
 // ── Instagram preview ─────────────────────────────────────────────────────────
 function InstagramPhone({ slides, activeIndex, onIndexChange }: Omit<Props, 'platform'>) {
+  const { username } = useSettings()
   const dragRef = useRef<{ startX: number; dragging: boolean }>({ startX: 0, dragging: false })
   function onMouseDown(e: React.MouseEvent) { dragRef.current = { startX: e.clientX, dragging: true } }
   function onMouseUp(e: React.MouseEvent) {
@@ -127,7 +129,7 @@ function InstagramPhone({ slides, activeIndex, onIndexChange }: Omit<Props, 'pla
           <span style={{ color: '#f5f0eb', fontSize: 13, fontWeight: 700 }}>T</span>
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: '#000' }}>tylerreed</div>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: '#000' }}>{username}</div>
           <div style={{ fontSize: 10.5, color: '#888' }}>Sponsored</div>
         </div>
         <button style={{ background: 'none', border: '1px solid #0095f6', color: '#0095f6', borderRadius: 8, padding: '4px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Follow</button>
@@ -154,7 +156,7 @@ function InstagramPhone({ slides, activeIndex, onIndexChange }: Omit<Props, 'pla
       <div style={{ padding: '2px 14px 14px', fontFamily: 'system-ui' }}>
         <div style={{ fontSize: 12.5, fontWeight: 600, color: '#000' }}>1,247 likes</div>
         <div style={{ fontSize: 12.5, color: '#000', marginTop: 2 }}>
-          <span style={{ fontWeight: 600 }}>tylerreed</span>{' '}
+          <span style={{ fontWeight: 600 }}>{username}</span>{' '}
           <span style={{ color: '#555' }}>Swipe through all {slides.length} slides →</span>
         </div>
       </div>
@@ -233,6 +235,7 @@ function LinkedInPhone({ slides, activeIndex, onIndexChange }: Omit<Props, 'plat
 
 // ── TikTok preview ─────────────────────────────────────────────────────────────
 function TikTokPhone({ slides, activeIndex, onIndexChange }: Omit<Props, 'platform'>) {
+  const { handle } = useSettings()
   const dragRef = useRef<{ startX: number; dragging: boolean }>({ startX: 0, dragging: false })
   function onMouseDown(e: React.MouseEvent) { dragRef.current = { startX: e.clientX, dragging: true } }
   function onMouseUp(e: React.MouseEvent) {
@@ -295,7 +298,7 @@ function TikTokPhone({ slides, activeIndex, onIndexChange }: Omit<Props, 'platfo
 
         {/* Bottom caption overlay */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 60, padding: '30px 12px 12px', background: 'linear-gradient(transparent, rgba(0,0,0,0.55))', zIndex: 20 }}>
-          <div style={{ fontFamily: 'system-ui', color: '#fff', fontSize: 12, fontWeight: 700, marginBottom: 2 }}>@tylerreed</div>
+          <div style={{ fontFamily: 'system-ui', color: '#fff', fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{handle}</div>
           <div style={{ fontFamily: 'system-ui', color: 'rgba(255,255,255,0.9)', fontSize: 11, lineHeight: 1.4 }}>
             Slide {activeIndex + 1} of {slides.length} — swipe to see more 👆
           </div>

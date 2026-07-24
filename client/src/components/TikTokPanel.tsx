@@ -4,14 +4,8 @@ import SlidePreview from './SlidePreview'
 import FlashBatchModal from './FlashBatchModal'
 import FlashLibraryModal from './FlashLibraryModal'
 
-const TIKTOK   = '#FE2C55'
-const TIKTOK_D = '#c4002c'
-const TEXT_C   = '#1C1E2E'
-const MUTED    = '#8890A4'
-const BORDER   = '#E5EAF5'
-const BG       = '#F0F4FF'
-const WHITE    = '#FFFFFF'
-const BLUE     = '#5B6CF2'
+import { BLUE, BORDER, BG, MUTED, TEXT as TEXT_C, TIKTOK, TIKTOK_D, WHITE } from '../lib/tokens'
+import { useSettings } from '../hooks/useSettings'
 
 type FlashStyle = 'statement' | 'video' | 'terminal'
 
@@ -46,6 +40,7 @@ const inputStyle: React.CSSProperties = {
 }
 
 export default function TikTokPanel({ slides, activeIndex, carouselId }: Props) {
+  const { handle, username } = useSettings()
   const slide = slides[activeIndex] ?? slides[0]
 
   // TT-specific text — separate from carousel, initialized from slide
@@ -336,13 +331,13 @@ export default function TikTokPanel({ slides, activeIndex, carouselId }: Props) 
                 ))}
               </div>
               <div style={{ position: 'absolute', bottom: 14, left: 10, right: 50 }}>
-                <div style={{ color: WHITE, fontSize: 12, fontWeight: 700, textShadow: '0 1px 4px rgba(0,0,0,0.9)', marginBottom: 2 }}>@tylerreedai</div>
+                <div style={{ color: WHITE, fontSize: 12, fontWeight: 700, textShadow: '0 1px 4px rgba(0,0,0,0.9)', marginBottom: 2 }}>{handle}</div>
                 <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 10, textShadow: '0 1px 3px rgba(0,0,0,0.9)', lineHeight: 1.4, marginBottom: 4 }}>
                   {ttText.headline.slice(0, 55)}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span style={{ fontSize: 10 }}>🎵</span>
-                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9 }}>Original Sound - tylerreedai</span>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 9 }}>Original Sound - {username}</span>
                 </div>
               </div>
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 3, background: TIKTOK, opacity: 0.8 }} />

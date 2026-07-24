@@ -147,7 +147,7 @@ export function defaultSlides(): Slide[] {
       type: 'cta',
       slideNumber: 7,
       headline: 'Follow For More',
-      emphasisLine: '@tylerreed',
+      emphasisLine: '@yourhandle',
       bodyText: 'New Claude Code tips every week.',
       bgColor: '#1B4332',
       textColor: '#F5F0EB',

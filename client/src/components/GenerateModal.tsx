@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Slide, genId } from '../types'
-
-const BLUE       = '#5B6CF2'
-const BLUE_LIGHT = '#EEF0FD'
-const BLUE_HOVER = '#4A59E0'
-const TEXT       = '#1C1E2E'
-const MUTED      = '#8890A4'
-const BORDER     = '#E5EAF5'
-const BG         = '#F0F4FF'
+import { BG, BLUE, BLUE_HOVER, BLUE_LIGHT, BORDER, MUTED, TEXT } from '../lib/tokens'
+import { useSettings } from '../hooks/useSettings'
 
 interface Framework {
   id: string; name: string; emoji: string; description: string; slideCount: number; slides: any[]
@@ -22,7 +16,8 @@ export default function GenerateModal({ onClose, onGenerated, platform }: Props)
   const [frameworks, setFrameworks] = useState<Framework[]>([])
   const [selectedFw, setSelectedFw] = useState('educational')
   const [topic, setTopic]           = useState('')
-  const [handle, setHandle]         = useState('@tylerreed')
+  const { handle: defaultHandle }   = useSettings()
+  const [handle, setHandle]         = useState('')
   const [loading, setLoading]       = useState(false)
   const [loadingMsg, setLoadingMsg] = useState('')
   const [error, setError]           = useState('')
@@ -38,7 +33,7 @@ export default function GenerateModal({ onClose, onGenerated, platform }: Props)
     let idx = 0; setLoadingMsg(msgs[0])
     const iv = setInterval(() => { idx = (idx + 1) % msgs.length; setLoadingMsg(msgs[idx]) }, 1800)
     try {
-      const res  = await fetch('/api/ai-generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: topic.trim(), frameworkId: selectedFw, platform, handle }) })
+      const res  = await fetch('/api/ai-generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: topic.trim(), frameworkId: selectedFw, platform, handle: handle.trim() || defaultHandle }) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       onGenerated(data.slides.map((s: any) => ({ ...s, id: genId() })), data.title)
@@ -109,7 +104,7 @@ export default function GenerateModal({ onClose, onGenerated, platform }: Props)
           <div>
             {fieldLabel('Your Handle')}
             <input
-              value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="@yourhandle"
+              value={handle} onChange={(e) => setHandle(e.target.value)} placeholder={defaultHandle}
               style={{
                 width: 200, background: BG, border: `1.5px solid ${BORDER}`, borderRadius: 10,
                 padding: '9px 12px', color: TEXT, fontSize: 13, outline: 'none', transition: 'border-color 0.15s',
