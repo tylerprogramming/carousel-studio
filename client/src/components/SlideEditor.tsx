@@ -13,8 +13,6 @@ interface Props {
   onChange: (updated: Slide) => void
   /** Which group of controls to render. The Inspector shows one tab at a time. */
   section?: 'content' | 'style' | 'image'
-  onBgImage?: (url: string, scope: 'single' | 'all', slideNumber?: number) => void
-  onBgImageEach?: (updates: { slideNumber: number; url: string }[]) => void
 }
 
 // ── Shared UI helpers ─────────────────────────────────────────────────────────
@@ -25,21 +23,6 @@ function FieldSection({ title, children }: { title: string; children: React.Reac
       <Label className="mb-2 block">{title}</Label>
       {children}
     </div>
-  )
-}
-
-function ColorSwatch({ color, active, onClick }: { color: { name: string; value: string }; active: boolean; onClick: (e: React.MouseEvent) => void }) {
-  return (
-    <button
-      title={`${color.name} — shift-click to apply to every slide`}
-      onClick={onClick}
-      className={cn(
-        'w-7 h-7 rounded-md transition-all duration-150 cursor-pointer',
-        active ? 'ring-2 ring-offset-2 ring-primary scale-110' : 'hover:scale-105',
-        (color.value === '#FFFFFF' || color.value === '#F5F0EB') && 'border border-border'
-      )}
-      style={{ background: color.value }}
-    />
   )
 }
 

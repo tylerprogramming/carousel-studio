@@ -9,6 +9,7 @@ component. If you change one, change the other.
 import json
 import os
 import re
+from functools import lru_cache
 import subprocess
 import sys
 import tempfile
@@ -32,6 +33,7 @@ FALLBACK_FONTS = [
 ]
 
 
+@lru_cache(maxsize=None)
 def load_font(size: int, weight: int = 400) -> ImageFont.FreeTypeFont:
     """Inter at an explicit weight. Inter ships as a variable font, so weight is
     selected on the wght axis rather than by loading a separate file."""
@@ -222,6 +224,7 @@ def mono_safe(text: str) -> str:
     return _MONO_OK.sub('', (text or '').replace('\t', ' ')).rstrip()
 
 
+@lru_cache(maxsize=None)
 def load_mono(size: int) -> ImageFont.FreeTypeFont:
     for p in MONO_FONTS:
         if os.path.exists(p):
@@ -368,8 +371,9 @@ def generate_terminal_slide(data):
             d.text((PADX + 30, ly), ln, font=f_line, fill=col)
             ly += line_h
     if (data.get('bodyText') or '').strip():
-        f_b = load_mono(fs(32))
-        n_lines = len(wrap_text(d, data['bodyText'].strip(), f_b, WIDTH - PADX * 2))
+        body_font = load_mono(fs(32))
+        body_lines = wrap_text(d, data['bodyText'].strip(), body_font, WIDTH - PADX * 2)
+        n_lines = len(body_lines)
         line_adv = round(fs(32) * 1.65)
         if lines:
             # Body sits under the terminal window rather than being dropped.
@@ -382,9 +386,9 @@ def generate_terminal_slide(data):
         else:
             by = 720
         body_fill = hex_to_rgb(data['bodyTextColor']) if data.get('bodyTextColor') else fg
-        for ln in wrap_text(d, data['bodyText'].strip(), f_b, WIDTH - PADX * 2):
-            d.text((PADX, by), ln, font=f_b, fill=body_fill)
-            by += round(fs(32) * 1.65)
+        for ln in body_lines:
+            d.text((PADX, by), ln, font=body_font, fill=body_fill)
+            by += line_adv
 
     foot = load_mono(26)
     d.text((PADX, HEIGHT - 64), handle, font=foot, fill=dim)
@@ -444,9 +448,10 @@ def generate_slide(data):
     measure = ImageDraw.Draw(img)
 
     # ── Inset media panel ─────────────────────────────────────────────────────
-    inset_media = load_media(data.get('insetImagePath'), None)
-    if not inset_media and data.get('insetImagePath', '').endswith(('.mp4', '.webm')):
-        inset_media = video_first_frame(data['insetImagePath'])
+    inset_path = data.get('insetImagePath') or ''
+    inset_is_video = inset_path.lower().endswith(('.mp4', '.webm', '.mov'))
+    inset_media = (load_media(None, inset_path) if inset_is_video
+                   else load_media(inset_path, None))
 
     inset_pos = data.get('insetPosition') or 'bottom'
     inset_h = 0

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Slide } from '../types'
 import { useSettings } from '../hooks/useSettings'
 
@@ -188,7 +189,7 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
   )
 }
 
-export default function SlidePreview({ slide, scale = 1, totalSlides = 7 }: SlidePreviewProps) {
+function SlidePreview({ slide, scale = 1, totalSlides = 7 }: SlidePreviewProps) {
   if (slide.variant === 'terminal') {
     return <TerminalSlide slide={slide} scale={scale} totalSlides={totalSlides} />
   }
@@ -370,3 +371,7 @@ export default function SlidePreview({ slide, scale = 1, totalSlides = 7 }: Slid
     </div>
   )
 }
+
+// Props are already identity-stable: updateSlide returns the same object for
+// slides it did not touch, and scale/totalSlides are numbers.
+export default memo(SlidePreview)

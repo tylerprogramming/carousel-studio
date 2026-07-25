@@ -9,8 +9,6 @@ type ImgScope = 'single' | 'all' | 'each'
 export interface BgImageCardProps {
   slide: Slide
   allSlides: Slide[]
-  onBgImage: (url: string, scope: 'single' | 'all', slideNumber?: number) => void
-  onBgImageEach: (updates: { slideNumber: number; url: string }[]) => void
   onSlideChange: (updated: Slide) => void
   /** Queues a background job and returns immediately with its id. */
   startJob: (body: Record<string, unknown>) => Promise<string>
@@ -46,26 +44,11 @@ function SparkleIcon() {
   )
 }
 
-function SpinnerIcon() {
-  return (
-    <svg
-      width="14" height="14" viewBox="0 0 14 14" fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      style={{ animation: 'bgcard-spin 0.75s linear infinite', flexShrink: 0 }}
-    >
-      <circle cx="7" cy="7" r="5.5" stroke="rgba(255,255,255,0.3)" strokeWidth="2"/>
-      <path d="M7 1.5A5.5 5.5 0 0 1 12.5 7" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-    </svg>
-  )
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function BgImageCard({
   slide,
   allSlides,
-  onBgImage,
-  onBgImageEach,
   onSlideChange,
   startJob,
   runningJobs,
@@ -540,14 +523,6 @@ export default function BgImageCard({
         </>
 
       </div>
-
-      {/* ── Spin keyframes ────────────────────────────────────────────── */}
-      <style>{`
-        @keyframes bgcard-spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

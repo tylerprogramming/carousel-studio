@@ -110,7 +110,7 @@ export default function App() {
 
   function loadCarousel(data: any) {
     setCarouselId(data.id)
-    resetConfig({ title: data.title, platform: data.platform, slides: data.slides })
+    resetConfig({ title: data.title, platform: data.platform ?? 'instagram', slides: data.slides })
     setActiveIndex(0); setPreviewIndex(0); setShowSaved(false)
     localStorage.setItem(CAROUSEL_ID_KEY, data.id)
     setSaveStatus('saved')
@@ -550,7 +550,7 @@ export default function App() {
               {activeSlide && (
                 <Inspector
                   slide={activeSlide} allSlides={config.slides} onChange={updateSlide}
-                  onBgImage={applyBgImage} onBgImageEach={applyBgImageEach} onSlideChange={updateSlide}
+                  onSlideChange={updateSlide}
                   startJob={startJob} runningJobs={running}
                 />
               )}
@@ -651,7 +651,7 @@ export default function App() {
               <div className="flex h-full flex-col overflow-hidden">
                 <Inspector
                   slide={activeSlide} allSlides={config.slides} onChange={updateSlide}
-                  onBgImage={applyBgImage} onBgImageEach={applyBgImageEach} onSlideChange={updateSlide}
+                  onSlideChange={updateSlide}
                   startJob={startJob} runningJobs={running}
                 />
               </div>

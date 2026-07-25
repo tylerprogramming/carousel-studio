@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 /**
  * Background job tracking.
@@ -80,5 +80,7 @@ export function useJobs(carouselId: string, carouselTitle: string, onComplete: (
     refresh()
   }, [refresh])
 
-  return { jobs, running: jobs.filter((j) => j.status === 'running'), start, cancel, refresh }
+  const running = useMemo(() => jobs.filter((j) => j.status === 'running'), [jobs])
+
+  return { jobs, running, start, cancel, refresh }
 }

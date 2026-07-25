@@ -90,7 +90,7 @@ def build(cfg):
     if audio:
         # Fade the tail so a hard cut on a 5 second clip is not jarring
         fade_out = max(0.0, dur - 0.6)
-        cmd += ['-filter_complex' if False else '-af',
+        cmd += ['-af',
                 f'afade=t=in:st=0:d=0.3,afade=t=out:st={fade_out:.2f}:d=0.6']
         cmd += ['-map', f'{2 if overlay else 1}:a', '-c:a', 'aac', '-b:a', '192k']
     else:
@@ -107,10 +107,9 @@ def main():
         print('usage: slide_video.py <json>', file=sys.stderr)
         sys.exit(1)
     cfg = json.loads(sys.argv[1])
-    for k in ('output',):
-        if not cfg.get(k):
-            print(f'missing required key: {k}', file=sys.stderr)
-            sys.exit(1)
+    if not cfg.get('output'):
+        print('missing required key: output', file=sys.stderr)
+        sys.exit(1)
     os.makedirs(os.path.dirname(cfg['output']) or '.', exist_ok=True)
     try:
         print(build(cfg))

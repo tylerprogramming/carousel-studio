@@ -24,6 +24,7 @@ import json
 import os
 import subprocess
 import tempfile
+from functools import lru_cache
 
 try:
     from PIL import Image, ImageDraw, ImageFont
@@ -35,17 +36,23 @@ W, H = 1080, 1920
 
 # ── Font loading ──────────────────────────────────────────────────────────────
 
+BOLD_FONTS = [
+    "/System/Library/Fonts/Supplemental/Futura.ttc",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+]
+REGULAR_FONTS = [
+    "/System/Library/Fonts/Supplemental/Avenir.ttc",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+]
+
+
+@lru_cache(maxsize=None)
 def load_font(size: int, bold: bool = True) -> ImageFont.FreeTypeFont:
-    # Futura first — clean, modern, very readable on social
-    candidates = [
-        "/System/Library/Fonts/Supplemental/Futura.ttc",
-        "/System/Library/Fonts/Supplemental/GillSans.ttc",
-        "/System/Library/Fonts/Helvetica.ttc",
-        "/Library/Fonts/Arial.ttf",
-        "/System/Library/Fonts/Arial.ttf",
-        "/System/Library/Fonts/SFNSDisplay.ttf",
-    ]
-    for path in candidates:
+    """Display face. `bold` used to be accepted and ignored, so every
+    'muted' sub-line rendered at headline weight."""
+    for path in (BOLD_FONTS if bold else REGULAR_FONTS):
         if os.path.exists(path):
             try:
                 return ImageFont.truetype(path, size)
