@@ -30,6 +30,24 @@ function timeAgo(ms: number) {
   return days < 30 ? `${days}d ago` : new Date(ms).toLocaleDateString()
 }
 
+/** A slide is a PNG or, for a moving cover, an MP4. Pick the right element. */
+function SlideMedia({ src, className, alt }: { src: string; className?: string; alt: string }) {
+  if (/\.(mp4|mov|webm)$/i.test(src)) {
+    return (
+      <video
+        src={src}
+        autoPlay
+        loop
+        muted
+        playsInline
+        className={className}
+        aria-label={alt}
+      />
+    )
+  }
+  return <img src={src} alt={alt} loading="lazy" className={className} />
+}
+
 export default function ExportsGallery({ onClose }: Props) {
   const [items, setItems] = useState<ExportedCarousel[]>([])
   const [dir, setDir] = useState('')
@@ -102,7 +120,7 @@ export default function ExportsGallery({ onClose }: Props) {
                   )}
                 >
                   <div className="relative aspect-[4/5] w-full overflow-hidden bg-secondary">
-                    <img src={c.cover} alt={c.slug} loading="lazy" className="h-full w-full object-cover" />
+                    <SlideMedia src={c.cover} alt={c.slug} className="h-full w-full object-cover" />
                     <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-px text-[10px] font-bold text-white">
                       {c.slideCount}
                     </span>
@@ -150,7 +168,7 @@ export default function ExportsGallery({ onClose }: Props) {
                 {open.slides.map((s, i) => (
                   <a key={s} href={s} target="_blank" rel="noreferrer"
                      className="overflow-hidden rounded-md border border-border hover:border-brand">
-                    <img src={s} alt={`slide ${i + 1}`} loading="lazy" className="aspect-[4/5] w-full object-cover" />
+                    <SlideMedia src={s} alt={`slide ${i + 1}`} className="aspect-[4/5] w-full object-cover" />
                   </a>
                 ))}
               </div>

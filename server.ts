@@ -919,10 +919,17 @@ app.get('/api/exports', (c) => {
       let files: string[] = []
       try { files = readdirSync(slugDir) } catch { return null }
 
-      // slide_1.png, slide_2.png … sorted numerically, not lexically
-      const slides = files
-        .filter((f) => /^slide_\d+\.png$/.test(f))
-        .sort((a, b) => parseInt(a.match(/\d+/)![0]) - parseInt(b.match(/\d+/)![0]))
+      // slide_1.png, slide_2.mp4 … sorted numerically, not lexically. A slide
+      // can be a video, and an mp4 wins over a png of the same number since it
+      // is the newer artifact for that slide.
+      const byNumber = new Map<number, string>()
+      for (const f of files) {
+        const m = f.match(/^slide_(\d+)\.(png|mp4)$/i)
+        if (!m) continue
+        const n = parseInt(m[1])
+        if (!byNumber.has(n) || m[2].toLowerCase() === 'mp4') byNumber.set(n, f)
+      }
+      const slides = [...byNumber.entries()].sort((a, b) => a[0] - b[0]).map(([, f]) => f)
       if (!slides.length) return null
 
       const pdf = files.find((f) => f.toLowerCase().endsWith('.pdf'))
@@ -1023,10 +1030,18 @@ app.get('/carousel-output/:slug/:filename', async (c) => {
   const filePath = resolveMediaPath(`/carousel-output/${slug}/${filename}`)
   if (!filePath) return c.text('Not found', 404)
   const file = Bun.file(filePath)
-  const contentType = filename.endsWith('.pdf') ? 'application/pdf' : 'image/png'
-  const disposition = filename.endsWith('.pdf') ? `attachment; filename="${filename}"` : 'inline'
+  const ext = filename.slice(filename.lastIndexOf('.')).toLowerCase()
+  const contentType = ext === '.pdf'  ? 'application/pdf'
+    : ext === '.mp4'  ? 'video/mp4'
+    : ext === '.mov'  ? 'video/quicktime'
+    : ext === '.webm' ? 'video/webm'
+    : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg'
+    : 'image/png'
+  const disposition = ext === '.pdf' ? `attachment; filename="${filename}"` : 'inline'
   return new Response(file, {
-    headers: { 'Content-Type': contentType, 'Cache-Control': 'no-store', 'Content-Disposition': disposition },
+    // Accept-Ranges lets the player seek instead of refusing to scrub
+    headers: { 'Content-Type': contentType, 'Cache-Control': 'no-store',
+               'Content-Disposition': disposition, 'Accept-Ranges': 'bytes' },
   })
 })
 
