@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { cn } from '../lib/utils'
 
 /**
@@ -48,14 +48,19 @@ function timeAgo(ms: number) {
 }
 
 /** A slide is a PNG or, for a moving cover, an MP4. Pick the right element. */
-function SlideMedia({ src, className, alt }: { src: string; className?: string; alt: string }) {
+function SlideMedia({ src, className, alt, controls }: {
+  src: string; className?: string; alt: string; controls?: boolean
+}) {
   if (/\.(mp4|mov|webm)$/i.test(src)) {
     return (
       <video
         src={src}
-        autoPlay
-        loop
-        muted
+        // Thumbnails loop silently; the big player gets real controls so the
+        // finished clip can actually be watched and scrubbed.
+        autoPlay={!controls}
+        loop={!controls}
+        muted={!controls}
+        controls={controls}
         playsInline
         className={className}
         aria-label={alt}
@@ -72,17 +77,54 @@ export default function ExportsGallery({ onClose }: Props) {
   const [open, setOpen] = useState<ExportedCarousel | null>(null)
   // Which platform set the detail pane is showing. Reset when the card changes.
   const [platform, setPlatform] = useState('default')
-  useEffect(() => { setPlatform('default') }, [open?.slug])
+  const [preview, setPreview] = useState<string | null>(null)
+  const [building, setBuilding] = useState(false)
+  const [buildNote, setBuildNote] = useState<string | null>(null)
+  useEffect(() => { setPlatform('default'); setPreview(null); setBuildNote(null) }, [open?.slug])
+
+  async function buildTikTok(slug: string) {
+    setBuilding(true); setBuildNote(null)
+    try {
+      const res = await fetch('/api/export-tiktok', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carouselSlug: slug }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      setBuildNote(
+        data.staticFromVideo?.length
+          ? `Built ${data.count} slides. Slide ${data.staticFromVideo[0].match(/\d+/)[0]} is a video on Instagram and is static here.`
+          : `Built ${data.count} slides.`,
+      )
+      await load(slug)
+    } catch (err) {
+      setBuildNote(String(err instanceof Error ? err.message : err))
+    } finally {
+      setBuilding(false)
+    }
+  }
   const [captions, setCaptions] = useState<string | null>(null)
   const [query, setQuery] = useState('')
 
-  useEffect(() => {
-    fetch('/api/exports')
-      .then((r) => r.json())
-      .then((d) => { setItems(d.carousels ?? []); setDir(d.exportDir ?? '') })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+  // Shared so building a variant can refresh the list, and so the open card
+  // picks up the variant it just produced instead of showing stale data.
+  const load = useCallback(async (reselectSlug?: string) => {
+    try {
+      const res = await fetch('/api/exports')
+      const data = await res.json()
+      const list: ExportedCarousel[] = data.carousels ?? []
+      setItems(list)
+      setDir(data.exportDir ?? '')
+      if (reselectSlug) {
+        const fresh = list.find((c) => c.slug === reselectSlug)
+        if (fresh) setOpen(fresh)
+      }
+    } catch { /* leave whatever is on screen */ } finally {
+      setLoading(false)
+    }
   }, [])
+
+  useEffect(() => { load() }, [load])
 
   useEffect(() => {
     setCaptions(null)
@@ -201,6 +243,39 @@ export default function ExportsGallery({ onClose }: Props) {
                 </a>
               </div>
 
+              {preview && (
+                <div className="mb-3">
+                  <div className="overflow-hidden rounded-lg border border-border bg-black">
+                    <SlideMedia src={preview} alt="preview" controls
+                                className="max-h-[420px] w-full object-contain" />
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="truncate text-[10px] text-muted-foreground">
+                      {preview.split('/').pop()}
+                    </span>
+                    <button onClick={() => setPreview(null)}
+                            className="text-[10px] text-muted-foreground hover:text-foreground">
+                      close
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!open.variants?.tiktok && (
+                <button
+                  onClick={() => buildTikTok(open.slug)}
+                  disabled={building}
+                  className="mb-3 w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand disabled:opacity-50"
+                >
+                  {building ? 'Building TikTok set…' : 'Build TikTok set'}
+                </button>
+              )}
+              {buildNote && (
+                <p className="mb-3 rounded-lg border border-border bg-secondary p-2 text-[11px] text-muted-foreground">
+                  {buildNote}
+                </p>
+              )}
+
               {Object.keys(open.variants ?? {}).length > 0 && (
                 <div className="mb-3 flex gap-1">
                   {['default', ...Object.keys(open.variants ?? {})].map((key) => (
@@ -230,14 +305,23 @@ export default function ExportsGallery({ onClose }: Props) {
 
               <div className={cn('mb-4 grid gap-2', platform === 'default' ? 'grid-cols-3' : 'grid-cols-4')}>
                 {(platform === 'default' ? open.slides : open.variants?.[platform]?.slides ?? []).map((s, i) => (
-                  <a key={s} href={s} target="_blank" rel="noreferrer"
-                     className="overflow-hidden rounded-md border border-border hover:border-brand">
+                  <button key={s} onClick={() => setPreview(s)}
+                     title={/\.(mp4|mov|webm)$/i.test(s) ? 'Play' : 'View'}
+                     className={cn(
+                       'relative overflow-hidden rounded-md border hover:border-brand',
+                       preview === s ? 'border-brand ring-2 ring-brand/30' : 'border-border',
+                     )}>
                     <SlideMedia
                       src={s}
                       alt={`slide ${i + 1}`}
                       className={cn('w-full object-cover', platform === 'default' ? 'aspect-[4/5]' : 'aspect-[9/16]')}
                     />
-                  </a>
+                    {/\.(mp4|mov|webm)$/i.test(s) && (
+                      <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[9px] font-bold text-white">
+                        MP4
+                      </span>
+                    )}
+                  </button>
                 ))}
               </div>
 

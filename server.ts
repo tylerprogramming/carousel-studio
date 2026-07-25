@@ -824,6 +824,55 @@ app.post('/api/export-all', async (c) => {
   })
 })
 
+// ── Platform variants ─────────────────────────────────────────────────────────
+
+// Re-frame an exported carousel for TikTok: every slide is placed inside a
+// 1080x1920 canvas clear of TikTok's caption block, action rail and tab chrome.
+// Writes to <slug>/tiktok/ so the gallery picks it up as a variant.
+// Available here and from the CLI (tiktok_safe.py) so both routes agree.
+app.post('/api/export-tiktok', async (c) => {
+  const { carouselSlug, bgColor = '#12141A', margin, topBias } = await c.req.json()
+  if (!carouselSlug) return c.json({ error: 'carouselSlug is required' }, 400)
+
+  const slugDir = join(exportDir(), carouselSlug)
+  if (!existsSync(slugDir)) return c.json({ error: `No export at ${carouselSlug}` }, 404)
+
+  const outDir = join(slugDir, 'tiktok')
+  mkdirSync(outDir, { recursive: true })
+  const script = join(import.meta.dir, 'tiktok_safe.py')
+
+  // Only stills reframe. Where a slide is a video, its PNG counterpart is used,
+  // so the TikTok set is complete but that slide does not move.
+  const stills = readdirSync(slugDir).filter((f) => /^slide_\d+\.png$/i.test(f))
+  const videos = readdirSync(slugDir).filter((f) => /^slide_\d+\.mp4$/i.test(f))
+  const stillNumbers = new Set(stills.map((f) => f.match(/\d+/)![0]))
+  if (!stills.length) return c.json({ error: 'No slide PNGs to reframe' }, 400)
+
+  const outcomes = await Promise.all(stills.map(async (name) => {
+    const payload = JSON.stringify({
+      input: join(slugDir, name), output: join(outDir, name), bgColor,
+      ...(margin != null ? { margin } : {}), ...(topBias != null ? { topBias } : {}),
+    })
+    const proc = Bun.spawn(['python3', script, payload], { stdout: 'ignore', stderr: 'pipe' })
+    const [code, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+    return code === 0 ? { ok: true as const, name } : { ok: false as const, name, stderr }
+  }))
+
+  const failed = outcomes.filter((o) => !o.ok)
+  if (failed.length) return c.json({ error: `Failed: ${failed.map((f: any) => f.name).join(', ')}` }, 500)
+
+  return c.json({
+    ok: true,
+    count: stills.length,
+    outputDir: outDir,
+    // A video slide reframed from its still: the set is complete, but that
+    // slide is static on TikTok. Saying so beats implying the motion carried.
+    staticFromVideo: videos.filter((v) => stillNumbers.has(v.match(/\d+/)![0])),
+    // A video slide with no still at all really is missing from the set.
+    missing: videos.filter((v) => !stillNumbers.has(v.match(/\d+/)![0])),
+  })
+})
+
 // ── Slide video (a moving carousel slide) ─────────────────────────────────────
 
 // Instagram carousels take video slides next to image slides, so slide 1 can
