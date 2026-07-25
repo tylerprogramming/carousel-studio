@@ -12,6 +12,7 @@ import GenerateModal from './components/GenerateModal'
 import SavedCarouselsDrawer from './components/SavedCarouselsDrawer'
 import BatchModal from './components/BatchModal'
 import CaptionModal from './components/CaptionModal'
+import ExportsGallery from './components/ExportsGallery'
 import TikTokPanel from './components/TikTokPanel'
 import {
   AppLogo, IgLogo, LiLogo, TikTokLogo, FolderIcon, SparkleIcon, BoltIcon,
@@ -56,6 +57,7 @@ export default function App() {
   const [showSaved, setShowSaved]       = useState(false)
   const [showBatch, setShowBatch]       = useState(false)
   const [showCaptions, setShowCaptions] = useState(false)
+  const [showExports, setShowExports]   = useState(false)
   const [exportFormat, setExportFormat] = useState<'png' | 'pdf' | 'both'>('both')
   const [mobileTab, setMobileTab]       = useState<MobileTab>('preview')
   const [saveStatus, setSaveStatus]     = useState<'saved' | 'unsaved' | 'saving'>('saved')
@@ -288,6 +290,14 @@ export default function App() {
           <FolderIcon /> Library
         </button>
 
+        <button
+          onClick={() => setShowExports(true)}
+          title="Browse carousels already exported to this machine"
+          className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-brand hover:bg-brand-light hover:text-brand"
+        >
+          <FolderIcon /> Exports
+        </button>
+
         <div className="flex items-center gap-0.5 rounded-lg border-[1.5px] border-border bg-secondary p-0.5">
           <button
             onClick={undo}
@@ -509,6 +519,7 @@ export default function App() {
       {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} onGenerated={handleGenerated} platform={config.platform} />}
       {showSaved && <SavedCarouselsDrawer onClose={() => setShowSaved(false)} onLoad={loadCarousel} onNew={newCarousel} currentId={carouselId} />}
       {showBatch && <BatchModal onClose={() => setShowBatch(false)} onDone={() => { setShowBatch(false); setShowSaved(true) }} />}
+      {showExports && <ExportsGallery onClose={() => setShowExports(false)} />}
       {showCaptions && <CaptionModal onClose={() => setShowCaptions(false)} config={config} slug={slugify(config.title)} />}
 
       {header}

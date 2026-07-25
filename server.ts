@@ -698,6 +698,55 @@ app.get('/api/flash-videos', (c) => {
   try { return c.json(JSON.parse(readFileSync(indexPath, 'utf8'))) } catch { return c.json([]) }
 })
 
+// ── Exported carousel library ─────────────────────────────────────────────────
+
+// GET /api/exports
+// Everything previously exported to disk, newest first. This is distinct from
+// /api/carousels: those are editable projects, these are finished output.
+app.get('/api/exports', (c) => {
+  const dir = exportDir()
+  if (!existsSync(dir)) return c.json([])
+
+  const entries = readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => {
+      const slugDir = join(dir, e.name)
+      let files: string[] = []
+      try { files = readdirSync(slugDir) } catch { return null }
+
+      // slide_1.png, slide_2.png … sorted numerically, not lexically
+      const slides = files
+        .filter((f) => /^slide_\d+\.png$/.test(f))
+        .sort((a, b) => parseInt(a.match(/\d+/)![0]) - parseInt(b.match(/\d+/)![0]))
+      if (!slides.length) return null
+
+      const pdf = files.find((f) => f.toLowerCase().endsWith('.pdf'))
+      let modified = 0
+      try { modified = statSync(join(slugDir, slides[0])).mtimeMs } catch { /* ignore */ }
+
+      return {
+        slug: e.name,
+        slideCount: slides.length,
+        slides: slides.map((f) => `/carousel-output/${encodeURIComponent(e.name)}/${f}`),
+        cover: `/carousel-output/${encodeURIComponent(e.name)}/${slides[0]}`,
+        pdf: pdf ? `/carousel-output/${encodeURIComponent(e.name)}/${pdf}` : null,
+        hasCaptions: files.includes('captions.md'),
+        modified,
+      }
+    })
+    .filter(Boolean) as any[]
+
+  entries.sort((a, b) => b.modified - a.modified)
+  return c.json({ exportDir: dir, carousels: entries })
+})
+
+// Captions written alongside an export, so they can be read without leaving the app
+app.get('/api/exports/:slug/captions', (c) => {
+  const path = resolveMediaPath(`/carousel-output/${c.req.param('slug')}/captions.md`)
+  if (!path) return c.json({ error: 'No captions for this carousel' }, 404)
+  return c.json({ markdown: readFileSync(path, 'utf8') })
+})
+
 // ── Generated image library ───────────────────────────────────────────────────
 
 app.get('/api/images', (c) => {
