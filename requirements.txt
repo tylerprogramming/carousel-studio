@@ -1,0 +1,2 @@
+# Slide rendering. Everything else in the Python layer is stdlib.
+Pillow>=10.0.0

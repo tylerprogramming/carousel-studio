@@ -1,74 +1,59 @@
 # Carousel Studio
 
-A local web app for building branded Instagram and LinkedIn carousels with AI-written copy and AI-generated backgrounds. Bun + Hono on the server, React + Vite in the browser, Pillow for export.
+Build branded carousels for Instagram, TikTok and LinkedIn. AI writes the copy,
+you control the design, and the export matches what you saw on screen.
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
+Runs locally. Bring your own API keys — nothing goes anywhere except the model
+provider you configure.
+
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 ![Bun](https://img.shields.io/badge/runtime-Bun-black)
 
-## Features
+## What it does
 
-- **5 content frameworks** — Educational, Hormozi, Quick Wins, Storytelling, Instagram Writer
-- **AI slide copy** — Claude Opus 5 writes every slide from a topic + framework, constrained to a JSON schema
-- **AI captions** — Instagram caption with 5 hashtags and a LinkedIn caption with none, written from the finished slides and saved as `captions.md`
-- **AI backgrounds** — per-slide or whole-carousel images via Kie.ai, generated concurrently
-- **Likeness support** — reference your own photo so generated people look like you
-- **What you see is what you export** — the PNG renderer is a deliberate mirror of the live preview (same font, geometry, and colour rules)
-- **Undo / redo** with keystroke coalescing, so typing is one undo step rather than one per character
-- **Drag to reorder**, duplicate slide, saved colour themes
-- **Multi-platform previews** — Instagram, LinkedIn, and TikTok phone mockups
-- **Export** — individual PNGs, a combined multi-page PDF, or both
-- **iPad / tablet layout** — tabbed Slides / Edit / BG / Preview under 1200px
+- **Writes the slides.** Give it a topic and a framework; Claude returns every
+  slide, schema-constrained. Captions too, Instagram and LinkedIn.
+- **Generates backgrounds.** Per slide or per carousel, via Kie.ai, optionally
+  using a photo of you as a likeness reference. Runs as a background job, so
+  the editor stays usable while images render.
+- **Exports what you see.** PNG, PDF, or an MP4 slide. The Python renderer is a
+  deliberate mirror of the live preview, down to the line-box maths.
+- **Two layouts.** A standard editorial slide, and a `terminal` variant with a
+  real terminal window for command-line content.
+- **Reframes for TikTok**, clear of the caption block and action rail.
+- Undo/redo, drag to reorder, shift-click any control to apply it to every
+  slide, and an exports gallery.
 
-## Keyboard shortcuts
+## Quickstart
 
-| Shortcut | Action |
-|---|---|
-| `⌘Z` / `⇧⌘Z` | Undo / redo |
-| `⌘S` | Save now |
-| `⌘D` | Duplicate current slide |
-| `⌘E` | Export |
-
-## Tech stack
-
-| Layer | Tech |
-|---|---|
-| Runtime | [Bun](https://bun.sh) |
-| API server | [Hono](https://hono.dev), port 3010 |
-| Frontend | React 19 + Vite 8, port 5175 |
-| Slide copy & captions | [Claude Opus 5](https://platform.claude.com) via `@anthropic-ai/sdk` |
-| Background images | [Kie.ai](https://kie.ai) (Nano Banana Pro / Nano Banana 2) |
-| Slide rendering | Pillow, with Inter vendored in `fonts/` |
-
-## Setup
-
-### 1. Install
+**You need** [Bun](https://bun.sh) 1.1+, Python 3.9+, and Pillow. `ffmpeg` only
+if you want video — PNG and PDF work without it.
 
 ```bash
 git clone https://github.com/tylerprogramming/carousel-studio.git
 cd carousel-studio
-bun install
-cd client && bun install && cd ..
+bun install && (cd client && bun install)
+pip install -r requirements.txt
+
+cp .env.example .env      # add at least ANTHROPIC_API_KEY
+bun run dev               # http://localhost:5175
 ```
 
-Python side: `pip install Pillow`. `ffmpeg` is optional — it's only used to pull the first frame of a background or inset video during export.
+Production: `bun run build && bun run start`, then http://localhost:3010.
 
-### 2. Configure keys
-
-```bash
-cp .env.example .env
-```
-
-Then fill in:
+### Keys
 
 | Key | Needed for |
 |---|---|
-| `ANTHROPIC_API_KEY` | Slide copy and captions (Claude Opus 5) |
+| `ANTHROPIC_API_KEY` | Slide copy and captions |
 | `KIE_API_KEY` | AI background images |
-| `OPENAI_API_KEY` | Optional fallback, only used when `ANTHROPIC_API_KEY` is unset (`gpt-5-mini`) |
+| `OPENAI_API_KEY` | Optional fallback, used only when `ANTHROPIC_API_KEY` is unset |
 
-Both AI paths are constrained to the same JSON schema, so the response shape is identical either way. Real environment variables override `.env`. If you use Claude Code, keys already in `~/.claude/.env` are picked up automatically and you can skip this step.
+Real environment variables win over `.env`. If you use Claude Code, keys in
+`~/.claude/.env` are picked up automatically.
 
-### 3. (Optional) Make it yours
+### Make it yours
 
 ```bash
 cp settings.example.json settings.json
@@ -76,114 +61,105 @@ cp settings.example.json settings.json
 
 | Field | What it does |
 |---|---|
-| `handle` | Your handle. Appears on CTA slides and in the preview mockups. |
-| `brandVoice` | A sentence describing how captions should sound. Appended to the caption prompt. |
-| `exportDir` | Where exports are written. Defaults to `./exports`. |
-| `likenessPath` | A photo of you, used as a reference image when "Use my likeness" is checked. |
-| `likenessDescription` | Appended to the image prompt so the model gets your appearance right. |
+| `handle` | Your handle. Appears on slides and in the preview mockups. |
+| `brandVoice` | A sentence on how captions should sound. |
+| `exportDir` | Where exports land. Defaults to `./exports`. Supports `~`. |
+| `imagesDir` | Where generated images land. Defaults to `./images`. |
+| `communityUrl` | Link shown on video footers. Omitted if unset. |
+| `likenessPath` | A photo of you, used as a reference image for generation. |
+| `likenessDescription` | Appended to image prompts so the model gets you right. |
 
-### 4. Run
+## Themes
 
-```bash
-bun run dev
+A theme is one JSON file in `themes/`. Drop it in, reload, it appears as a
+swatch. Only the three colours are required.
+
+```json
+{ "name": "Midnight", "bgColor": "#1A1A2E", "textColor": "#F5F0EB", "accentColor": "#5BA4CF" }
 ```
 
-Open http://localhost:5175.
-
-For a production build: `bun run build && bun run start`, then open http://localhost:3010.
-
-### 5. (Optional) Reach it from an iPad
-
-```bash
-ngrok http --url=your-domain.ngrok-free.app --basic-auth="user:password" 5175
-```
-
-Allow the tunnel host via env var rather than editing the config:
-
-```bash
-VITE_ALLOWED_HOSTS=your-domain.ngrok-free.app bun run dev
-```
-
-## Project structure
-
-```
-carousel-studio/
-├── server.ts                  # Hono API (port 3010)
-├── generate_slide.py          # Slide renderer + PDF combiner
-├── generate_bg_image.py       # Kie.ai image generation
-├── flash_video.py             # Short-form video generation
-├── fonts/Inter-Variable.ttf   # Vendored so exports match the preview
-├── .env.example               # Copy to .env and add your keys
-├── settings.example.json      # Copy to settings.json to set handle, voice, export dir
-├── frameworks/                # Framework definitions, auto-discovered
-└── client/src/
-    ├── App.tsx
-    ├── lib/tokens.ts          # Single source of truth for chrome colours
-    ├── hooks/useHistory.ts    # Undo/redo
-    └── components/
-        ├── SlidePreview.tsx   # Live renderer — twin of generate_slide.py
-        ├── SlideEditor.tsx    # Content + style editing
-        ├── SlideList.tsx      # Slide strip, drag to reorder
-        ├── ThemePicker.tsx    # Saved colour themes
-        ├── CaptionModal.tsx   # Caption generation
-        └── icons.tsx          # Shared inline SVGs
-```
-
-## Renderer parity
-
-`generate_slide.py` and `client/src/components/SlidePreview.tsx` are two implementations of the same design. Every geometry constant, font size, weight, and colour rule appears in both, and **changing one means changing the other** — otherwise the app stops being a preview of what you actually post.
-
-The renderer reproduces the CSS layout model directly: line boxes with half-leading rather than stacked bounding boxes, `object-fit: cover` cropping rather than a stretch-to-fill resize, and Inter selected on its variable weight axis rather than a lookalike system font.
-
-## API
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/frameworks` | List frameworks |
-| `POST` | `/api/ai-generate` | Generate slides from a topic + framework |
-| `POST` | `/api/bulk-generate` | Generate several carousels at once |
-| `POST` | `/api/captions` | Write Instagram + LinkedIn captions |
-| `GET` `POST` | `/api/carousels` | List / save carousels |
-| `GET` `DELETE` | `/api/carousels/:id` | Load / delete a carousel |
-| `POST` | `/api/generate-bg-image` | Generate backgrounds (SSE stream) |
-| `GET` `DELETE` | `/api/images` | Browse / delete generated backgrounds |
-| `POST` | `/api/export-slide` | Render one slide to PNG |
-| `POST` | `/api/export-all` | Render every slide, plus PDF |
-| `POST` | `/api/flash-video` | Generate a short-form video |
-| `GET` | `/api/flash-videos` | List generated videos |
-| `GET` `POST` | `/api/settings` | Read / update settings |
-| `GET` | `/files/:filename` | Serve generated output |
-| `GET` | `/carousel-output/:slug/:filename` | Serve exported carousels |
+Full format and the contrast trap: [`themes/README.md`](themes/README.md).
 
 ## Frameworks
 
-Each framework is a JSON file in `frameworks/`, discovered automatically at startup:
+A framework is one JSON file in `frameworks/`, discovered at startup.
+`systemPrompt` sets the voice; each slide's `purpose` tells the model what job
+that slide does. Neither is sent to the browser.
 
 ```json
 {
   "id": "hormozi",
   "name": "Hormozi",
-  "description": "Contrarian, proof-driven, authority-based",
   "slideCount": 7,
   "systemPrompt": "…",
   "slides": [{ "slideNumber": 1, "type": "cover", "purpose": "…" }]
 }
 ```
 
-`systemPrompt` sets the voice; each slide's `purpose` tells the model what job that slide does in the arc. Neither is sent to the browser.
+## Renderer parity — read this before editing
+
+`generate_slide.py` and `client/src/components/SlidePreview.tsx` are two
+implementations of the same design. Every geometry constant, font size, weight
+and colour rule lives in both, and **changing one means changing the other** —
+otherwise the app stops being a preview of what you actually post.
+
+The Python side reproduces the CSS layout model rather than approximating it:
+line boxes with half-leading, `object-fit: cover` cropping, and Inter selected
+on its variable weight axis.
+
+Similarly, `flash_video.py` (1080x1920, standalone Reels) and `slide_video.py`
+(1080x1350, a slide inside a carousel) are separate on purpose. Same idea,
+different aspect, different job.
+
+## Layout
+
+```
+server.ts              Hono API, port 3010
+generate_slide.py      Slide renderer + PDF combiner  -- twin of SlidePreview.tsx
+generate_bg_image.py   Kie.ai image generation
+slide_video.py         A carousel slide as 1080x1350 MP4
+flash_video.py         A standalone 1080x1920 Reel
+tiktok_safe.py         Reframe a slide clear of TikTok's UI
+themes/                One JSON per theme
+frameworks/            One JSON per framework
+fonts/                 Inter, vendored so exports match the preview
+client/src/            React 19 + Vite, port 5175
+```
+
+## API
+
+| Method | Path | |
+|---|---|---|
+| `GET` | `/api/frameworks` `/api/themes` | List frameworks / themes |
+| `POST` | `/api/ai-generate` `/api/bulk-generate` | Generate one / many carousels |
+| `POST` | `/api/captions` | Write Instagram + LinkedIn captions |
+| `GET` `POST` | `/api/carousels` | List / save |
+| `GET` `DELETE` | `/api/carousels/:id` | Load / delete |
+| `POST` | `/api/jobs/generate-bg` | Queue background generation |
+| `GET` `DELETE` | `/api/jobs` `/api/jobs/:id` | Poll / cancel jobs |
+| `GET` `DELETE` | `/api/images` | Browse / delete images |
+| `POST` | `/api/generate-slide` `/api/export-all` | Render one slide / all + PDF |
+| `POST` | `/api/slide-video` | Render a slide as MP4 |
+| `POST` | `/api/flash-video` | Render a standalone Reel |
+| `GET` | `/api/exports` | Exported carousels |
+| `GET` `POST` | `/api/settings` | Read / update settings |
+
+## Keyboard shortcuts
+
+`⌘Z` / `⇧⌘Z` undo, redo · `⌘S` save · `⌘D` duplicate slide · `⌘E` export
 
 ## Export
 
-Exports go to `./exports/<slug>/` by default. Point `exportDir` in `settings.json` (or `CAROUSEL_EXPORT_DIR`) somewhere else to write straight into a content repo.
-
 ```
 exports/my-carousel/
-  slide_1.png
-  …
+  slide_1.mp4        # if the cover is a video slide
+  slide_2.png
   captions.md
   my-carousel.pdf
 ```
 
+Point `exportDir` at a content repo to write straight into it.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
