@@ -1,0 +1,9 @@
+{
+  "id": "cream",
+  "name": "Cream",
+  "description": "Warm off-white with a coral accent. The default editorial look.",
+  "bgColor": "#F5F0EB",
+  "textColor": "#1B1B1B",
+  "accentColor": "#E07355",
+  "order": 1
+}

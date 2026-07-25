@@ -1,0 +1,9 @@
+{
+  "id": "sand",
+  "name": "Sand",
+  "description": "Muted tan with a forest green accent.",
+  "bgColor": "#C9B99A",
+  "textColor": "#1B1B1B",
+  "accentColor": "#1B4332",
+  "order": 4
+}

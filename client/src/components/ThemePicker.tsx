@@ -5,9 +5,11 @@ import { cn } from '../lib/utils'
 /**
  * Saved colour themes.
  *
- * A theme is just the three colours a slide is built from. Built-ins cover the
- * palettes this channel already uses; custom ones are saved to localStorage so
- * they survive reloads without needing a server round trip.
+ * A theme is just the three colours a slide is built from, plus an optional
+ * layout variant. Built-ins are JSON files in themes/ served by /api/themes —
+ * anyone can add one by dropping a file in that folder, no rebuild needed. See
+ * themes/README.md. Themes you save from the UI stay in localStorage, since
+ * they are personal to this browser rather than part of the app.
  */
 
 export interface Theme {
@@ -21,15 +23,6 @@ export interface Theme {
   builtin?: boolean
 }
 
-const BUILTIN: Theme[] = [
-  { id: 'cream',   name: 'Cream',   bgColor: '#F5F0EB', textColor: '#1B1B1B', accentColor: '#E07355', builtin: true },
-  { id: 'forest',  name: 'Forest',  bgColor: '#1B4332', textColor: '#F5F0EB', accentColor: '#E07355', builtin: true },
-  { id: 'midnight',name: 'Midnight',bgColor: '#1A1A2E', textColor: '#F5F0EB', accentColor: '#5BA4CF', builtin: true },
-  { id: 'sand',    name: 'Sand',    bgColor: '#C9B99A', textColor: '#1B1B1B', accentColor: '#1B4332', builtin: true },
-  { id: 'mono',    name: 'Mono',    bgColor: '#FFFFFF', textColor: '#1B1B1B', accentColor: '#1B1B1B', builtin: true },
-  // Terminal is a layout as well as a palette — see SlideVariant in types.ts
-  { id: 'terminal', name: 'Terminal', bgColor: '#12141A', textColor: '#EEECE8', accentColor: '#E07355', variant: 'terminal', builtin: true },
-]
 
 const STORAGE_KEY = 'carousel_studio_themes'
 
@@ -49,7 +42,18 @@ interface Props {
 }
 
 export default function ThemePicker({ slide, onApply }: Props) {
+  const [builtin, setBuiltin] = useState<Theme[]>([])
   const [custom, setCustom] = useState<Theme[]>(loadCustom)
+
+  // Built-ins live on disk, so a new themes/*.json appears on reload
+  useEffect(() => {
+    let alive = true
+    fetch('/api/themes')
+      .then((r) => (r.ok ? r.json() : []))
+      .catch(() => [])
+      .then((list: Theme[]) => { if (alive) setBuiltin(Array.isArray(list) ? list : []) })
+    return () => { alive = false }
+  }, [])
   const [naming, setNaming] = useState(false)
   const [draftName, setDraftName] = useState('')
 
@@ -57,7 +61,7 @@ export default function ThemePicker({ slide, onApply }: Props) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(custom))
   }, [custom])
 
-  const themes = [...BUILTIN, ...custom]
+  const themes = [...builtin, ...custom]
 
   function saveCurrent() {
     const name = draftName.trim()

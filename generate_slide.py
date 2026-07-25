@@ -296,7 +296,7 @@ def generate_terminal_slide(data):
     if step is not None and stype == 'content':
         f_step = load_font(fs(48), 900)
         tw = d.textbbox((0, 0), str(step), font=f_step)[2]
-        d.rounded_rectangle([PADX, y, PADX + tw + 48, y + fs(48) + 28], radius=8, fill=ac)
+        d.rectangle([PADX, y, PADX + tw + 48, y + fs(48) + 28], fill=ac)
         d.text((PADX + 24, y + 14), str(step), font=f_step, fill=bg)
         y += fs(48) + 28 + 28
 
@@ -315,11 +315,14 @@ def generate_terminal_slide(data):
             # One pill per wrapped line, mirroring box-decoration-break: clone
             f_e = load_font(fs(44), 700)
             avail = WIDTH - PADX * 2 - 40
+            pill_h = fs(44) + 20
             for line in wrap_text(d, emphasis, f_e, avail):
                 tw = d.textbbox((0, 0), line, font=f_e)[2]
-                d.rounded_rectangle([PADX, y, PADX + tw + 36, y + fs(44) + 20], radius=8, fill=ac)
+                # Square corners, and advance by exactly the pill height so
+                # stacked lines read as one continuous highlight
+                d.rectangle([PADX, y, PADX + tw + 36, y + pill_h], fill=ac)
                 d.text((PADX + 18, y + 10), line, font=f_e, fill=bg)
-                y += fs(44) + 30
+                y += pill_h
         else:
             f_e = load_font(fs(44), 600)
             d.text((PADX, y), emphasis, font=f_e, fill=ac)
@@ -349,8 +352,9 @@ def generate_terminal_slide(data):
         # frame. Drop it into the faded zone above the footer instead.
         n_lines = len(wrap_text(d, data['bodyText'].strip(), f_b, WIDTH - PADX * 2))
         by = (HEIGHT - 150 - n_lines * round(fs(32) * 1.65)) if has_photo else 720
+        body_fill = hex_to_rgb(data['bodyTextColor']) if data.get('bodyTextColor') else fg
         for ln in wrap_text(d, data['bodyText'].strip(), f_b, WIDTH - PADX * 2):
-            d.text((PADX, by), ln, font=f_b, fill=dim)
+            d.text((PADX, by), ln, font=f_b, fill=body_fill)
             by += round(fs(32) * 1.65)
 
     foot = load_mono(26)

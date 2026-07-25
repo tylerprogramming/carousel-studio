@@ -1,0 +1,9 @@
+{
+  "id": "mono",
+  "name": "Mono",
+  "description": "Pure black on white. No accent colour at all.",
+  "bgColor": "#FFFFFF",
+  "textColor": "#1B1B1B",
+  "accentColor": "#1B1B1B",
+  "order": 5
+}

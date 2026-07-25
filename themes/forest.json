@@ -1,0 +1,9 @@
+{
+  "id": "forest",
+  "name": "Forest",
+  "description": "Deep green with coral. Good for a dark slide that is not black.",
+  "bgColor": "#1B4332",
+  "textColor": "#F5F0EB",
+  "accentColor": "#E07355",
+  "order": 2
+}

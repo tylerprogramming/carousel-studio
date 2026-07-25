@@ -11,6 +11,7 @@ app.use('*', cors())
 const OUTPUT_DIR           = join(import.meta.dir, 'output')
 const FRAMEWORKS_DIR        = join(import.meta.dir, 'frameworks')
 const CAROUSELS_DIR         = join(import.meta.dir, 'carousels')
+const THEMES_DIR            = join(import.meta.dir, 'themes')
 // Where finished carousels land. Defaults to a folder inside the app so a fresh
 // clone works with no configuration; point it somewhere else (e.g. a content
 // repo) with CAROUSEL_EXPORT_DIR or `exportDir` in settings.json.
@@ -106,6 +107,30 @@ app.post('/api/settings', async (c) => {
   const body = await c.req.json()
   writeSettings(body)
   return c.json({ ok: true, settings: readSettings() })
+})
+
+// ── Themes ────────────────────────────────────────────────────────────────────
+
+// A theme is one JSON file in themes/. Drop a file in, reload the app, and it
+// shows up — no rebuild, no code change. See themes/README.md for the fields.
+app.get('/api/themes', (c) => {
+  try {
+    const themes = readdirSync(THEMES_DIR)
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => {
+        try {
+          const t = JSON.parse(readFileSync(join(THEMES_DIR, f), 'utf8'))
+          if (!t.bgColor || !t.textColor || !t.accentColor) return null
+          return { ...t, id: t.id || f.replace(/\.json$/, ''), builtin: true }
+        } catch { return null }   // one malformed file must not hide the rest
+      })
+      .filter(Boolean)
+      // Explicit `order` keeps the swatch row stable; readdir order is not.
+      .sort((a: any, b: any) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name))
+    return c.json(themes)
+  } catch {
+    return c.json([])
+  }
 })
 
 // ── Carousel Save / Load ──────────────────────────────────────────────────────

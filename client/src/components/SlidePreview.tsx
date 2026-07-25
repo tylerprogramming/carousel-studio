@@ -86,7 +86,7 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
           <div style={{
             display: 'inline-block', background: AC, color: BG,
             fontSize: sf(48), fontWeight: 900, lineHeight: 1,
-            padding: `${s(14)}px ${s(24)}px`, borderRadius: s(8), marginBottom: s(28),
+            padding: `${s(14)}px ${s(24)}px`, borderRadius: 0, marginBottom: s(28),
           }}>{slide.stepNumber}</div>
         )}
         {slide.headline && (
@@ -101,8 +101,10 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
               // `inline` + cloned decoration so a long line wraps into stacked
               // pills rather than overflowing the slide edge
               display: 'inline', background: AC, color: BG,
-              fontSize: sf(44), fontWeight: 700, lineHeight: 1.75,
-              padding: `${s(10)}px ${s(18)}px`, borderRadius: s(8),
+              // lineHeight matches the pill height so wrapped lines stack flush
+              // and read as one highlight, mirroring generate_slide.py
+              fontSize: sf(44), fontWeight: 700, lineHeight: 1.66,
+              padding: `${s(10)}px ${s(18)}px`, borderRadius: 0,
               boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone',
             } as React.CSSProperties}>{slide.emphasisLine}</span>
           ) : (
@@ -152,7 +154,8 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
           // With a photo behind, 720 lands the copy on the brightest part of
           // the frame. Drop it into the faded zone above the footer instead.
           ...(slide.backgroundImage ? { bottom: s(150) } : { top: s(720) }),
-          fontFamily: MONO, fontSize: sf(32), lineHeight: 1.65, color: DIM,
+          fontFamily: MONO, fontSize: sf(32), lineHeight: 1.65,
+          color: slide.bodyTextColor || FG,
         }}>{slide.bodyText}</div>
       )}
 

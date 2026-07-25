@@ -1,0 +1,10 @@
+{
+  "id": "terminal",
+  "name": "Terminal",
+  "description": "Dark mono look with a terminal window block. Also switches the slide layout, not just the palette.",
+  "bgColor": "#12141A",
+  "textColor": "#EEECE8",
+  "accentColor": "#E07355",
+  "variant": "terminal",
+  "order": 6
+}
