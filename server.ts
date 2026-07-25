@@ -906,7 +906,7 @@ app.post('/api/export-tiktok', async (c) => {
 // video one: the slides you already have, held a beat each, at 1080x1920.
 // Prefers the tiktok/ reframed set so nothing sits under TikTok's UI.
 app.post('/api/carousel-video', async (c) => {
-  const { carouselSlug, duration = 5, fade = 0, audio, coverBoost } = await c.req.json()
+  const { carouselSlug, perSlide = 2.5, fade = 0.2, audio, coverBoost } = await c.req.json()
   if (!carouselSlug) return c.json({ error: 'carouselSlug is required' }, 400)
 
   const slugDir = join(exportDir(), carouselSlug)
@@ -925,7 +925,7 @@ app.post('/api/carousel-video', async (c) => {
   const filename = `${carouselSlug}-tiktok.mp4`
   const outputPath = join(slugDir, filename)
   const payload = JSON.stringify({
-    inputs, output: outputPath, duration, fade,
+    inputs, output: outputPath, perSlide, fade,
     ...(coverBoost != null ? { coverBoost } : {}),
     ...(audio ? { audio: resolveMediaPath(audio) ?? undefined } : {}),
   })
@@ -934,15 +934,16 @@ app.post('/api/carousel-video', async (c) => {
   const [code, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
   if (code !== 0) return c.json({ error: `carousel video failed: ${stderr}` }, 500)
 
-  const perSlide = duration / inputs.length
+  // Cover is held coverBoost times longer, so the total is not a flat multiple
+  const boost = coverBoost ?? 1.4
+  const duration = Math.round(perSlide * (boost + inputs.length - 1) * 10) / 10
   return c.json({
     ok: true,
     url: `/carousel-output/${encodeURIComponent(carouselSlug)}/${filename}`,
-    filename, slideCount: inputs.length, duration,
+    filename, slideCount: inputs.length, perSlide, duration,
     usedReframed: sourceDir === tiktokDir,
-    // Under a second a slide is not long enough to read body copy. Say so
-    // rather than shipping something unreadable and calling it done.
-    tooFast: perSlide < 0.9,
+    // Under a second and a half, body copy cannot be read at a glance.
+    tooFast: perSlide < 1.5,
   })
 })
 

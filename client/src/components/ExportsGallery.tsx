@@ -84,19 +84,19 @@ export default function ExportsGallery({ onClose }: Props) {
   const [buildNote, setBuildNote] = useState<string | null>(null)
   useEffect(() => { setPlatform('default'); setPreview(null); setBuildNote(null) }, [open?.slug])
 
-  async function buildCarouselVideo(slug: string, duration: number) {
+  async function buildCarouselVideo(slug: string, perSlide: number) {
     setBuilding(true); setBuildNote(null)
     try {
       const res = await fetch('/api/carousel-video', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ carouselSlug: slug, duration, fade: 0.2 }),
+        body: JSON.stringify({ carouselSlug: slug, perSlide, fade: 0.2 }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
       setBuildNote(
         data.tooFast
-          ? `Built ${data.slideCount} slides in ${data.duration}s. That is under a second each, too fast to read body copy — try a longer one.`
-          : `Built ${data.slideCount} slides in ${data.duration}s.`,
+          ? `${data.slideCount} slides at ${data.perSlide}s each = ${data.duration}s. Too fast to read body copy — try a longer hold.`
+          : `${data.slideCount} slides at ${data.perSlide}s each = ${data.duration}s.`,
       )
       await load(slug)
       setPreview(data.url)
@@ -301,15 +301,15 @@ export default function ExportsGallery({ onClose }: Props) {
                     {building ? 'Working…' : 'Build TikTok set'}
                   </button>
                 )}
-                {[5, 9].map((secs) => (
+                {[2, 2.5, 3].map((secs) => (
                   <button
                     key={secs}
                     onClick={() => buildCarouselVideo(open.slug, secs)}
                     disabled={building}
-                    title={`Play every slide as one ${secs}s vertical video`}
+                    title={`Hold each slide ${secs}s — about ${Math.round(secs * (open.slideCount + 0.4))}s total`}
                     className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand disabled:opacity-50"
                   >
-                    {building ? '…' : `${secs}s video`}
+                    {building ? '…' : `${secs}s/slide`}
                   </button>
                 ))}
               </div>

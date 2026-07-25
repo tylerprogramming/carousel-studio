@@ -15,8 +15,9 @@ Usage: python3 slides_to_video.py '<json payload>'
 Payload:
   inputs     : list of image paths, in order                  (required)
   output     : where to write the mp4                         (required)
-  duration   : total seconds. Per-slide time is derived.      (default 5)
-  coverBoost : extra share of time for slide 1                (default 1.6)
+  perSlide   : seconds each slide is held. Total is derived.  (default 2.5)
+  duration   : total seconds instead, split across slides.    (optional)
+  coverBoost : the cover is held this much longer             (default 1.4)
   audio      : audio file laid under it                       (optional)
   fade       : cross-fade seconds between slides, 0 for cuts  (default 0)
 """
@@ -37,12 +38,17 @@ def run(cmd):
     return proc
 
 
-def slide_durations(count, total, cover_boost):
-    """Cover holds longer than the rest; the others split what is left."""
-    if count == 1:
-        return [total]
-    weights = [cover_boost] + [1.0] * (count - 1)
-    unit = total / sum(weights)
+def slide_durations(count, cover_boost, per_slide=None, total=None):
+    """Hold each slide for a fixed beat, cover a little longer.
+
+    per_slide is the honest control: a reader needs a couple of seconds per
+    slide, so the clip length should follow the slide count rather than the
+    slides being squeezed into a fixed runtime.
+    """
+    weights = [cover_boost] + [1.0] * (count - 1) if count > 1 else [1.0]
+    if per_slide is not None:
+        return [w * per_slide for w in weights]
+    unit = float(total) / sum(weights)
     return [w * unit for w in weights]
 
 
@@ -51,10 +57,18 @@ def build(cfg):
     if not inputs:
         raise RuntimeError('no input images exist')
     out = cfg['output']
-    total = float(cfg.get('duration', 5))
     fade = float(cfg.get('fade', 0) or 0)
     audio = cfg.get('audio') or ''
-    durations = slide_durations(len(inputs), total, float(cfg.get('coverBoost', 1.6)))
+    cover_boost = float(cfg.get('coverBoost', 1.4))
+    per_slide = cfg.get('perSlide')
+    if per_slide is None and not cfg.get('duration'):
+        per_slide = 2.5
+    durations = slide_durations(
+        len(inputs), cover_boost,
+        per_slide=float(per_slide) if per_slide is not None else None,
+        total=float(cfg['duration']) if per_slide is None else None,
+    )
+    total = sum(durations)
 
     os.makedirs(os.path.dirname(out) or '.', exist_ok=True)
 
