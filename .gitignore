@@ -9,6 +9,8 @@ client/dist/
 output/
 carousels/
 exports/
+images/
+!images/README.md
 settings.json
 
 # Environment & secrets

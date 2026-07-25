@@ -26,10 +26,10 @@ function FieldSection({ title, children }: { title: string; children: React.Reac
   )
 }
 
-function ColorSwatch({ color, active, onClick }: { color: { name: string; value: string }; active: boolean; onClick: () => void }) {
+function ColorSwatch({ color, active, onClick }: { color: { name: string; value: string }; active: boolean; onClick: (e: React.MouseEvent) => void }) {
   return (
     <button
-      title={color.name}
+      title={`${color.name} — shift-click to apply to every slide`}
       onClick={onClick}
       className={cn(
         'w-7 h-7 rounded-md transition-all duration-150 cursor-pointer',
@@ -54,6 +54,21 @@ export default function SlideEditor({ slide, onChange }: Props) {
     onChange({ ...slide, [key]: val })
   }
 
+  /**
+   * Shift-aware setter. Plain click edits this slide; shift-click pushes the
+   * same key to every slide in the carousel. `extraKeys` lets one control
+   * propagate a group, e.g. the theme swatches send all three colours.
+   */
+  function setMaybeAll<K extends keyof Slide>(
+    e: { shiftKey: boolean },
+    key: K,
+    val: Slide[K],
+    extraKeys: (keyof Slide)[] = [],
+  ) {
+    const next = { ...slide, [key]: val }
+    onChange(e.shiftKey ? ({ ...next, _applyKeysToAll: [key, ...extraKeys] } as any) : next)
+  }
+
   return (
     <div
       className="flex overflow-hidden bg-card border-r border-border shrink-0"
@@ -67,7 +82,7 @@ export default function SlideEditor({ slide, onChange }: Props) {
             {SLIDE_TYPES.map((t) => (
               <button
                 key={t.value}
-                onClick={() => set('type', t.value)}
+                onClick={(e) => setMaybeAll(e, 'type', t.value)}
                 className={cn(
                   'flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer border',
                   slide.type === t.value
@@ -146,7 +161,7 @@ export default function SlideEditor({ slide, onChange }: Props) {
                 return (
                   <button
                     key={p.label}
-                    onClick={() => set('textScale', p.val)}
+                    onClick={(e) => setMaybeAll(e, 'textScale', p.val)}
                     className={cn(
                       'w-9 h-8 rounded-md text-xs font-semibold border transition-all duration-150 cursor-pointer',
                       active
@@ -185,7 +200,7 @@ export default function SlideEditor({ slide, onChange }: Props) {
               }
               onChange(
                 scope === 'all'
-                  ? ({ ...slide, ...colors, _applyColorsToAll: true } as any)
+                  ? ({ ...slide, ...colors, _applyKeysToAll: ['bgColor', 'textColor', 'accentColor', 'variant'] } as any)
                   : { ...slide, ...colors },
               )
             }}
@@ -199,7 +214,7 @@ export default function SlideEditor({ slide, onChange }: Props) {
                 key={c.value}
                 color={c}
                 active={c.value.toLowerCase() === slide.bgColor.toLowerCase()}
-                onClick={() => set('bgColor', c.value)}
+                onClick={(e) => setMaybeAll(e, 'bgColor', c.value)}
               />
             ))}
             <input type="color" value={slide.bgColor} onChange={(e) => set('bgColor', e.target.value)}
@@ -215,7 +230,7 @@ export default function SlideEditor({ slide, onChange }: Props) {
               return (
                 <button
                   key={c.value}
-                  onClick={() => set('textColor', c.value)}
+                  onClick={(e) => setMaybeAll(e, 'textColor', c.value)}
                   className={cn(
                     'px-3 py-1.5 rounded-md text-xs font-semibold border transition-all duration-150 cursor-pointer',
                     active
@@ -240,7 +255,7 @@ export default function SlideEditor({ slide, onChange }: Props) {
                 key={c.value}
                 color={c}
                 active={c.value.toLowerCase() === slide.accentColor.toLowerCase()}
-                onClick={() => set('accentColor', c.value)}
+                onClick={(e) => setMaybeAll(e, 'accentColor', c.value)}
               />
             ))}
             <input type="color" value={slide.accentColor} onChange={(e) => set('accentColor', e.target.value)}
@@ -253,7 +268,7 @@ export default function SlideEditor({ slide, onChange }: Props) {
             {['#FFFFFF', '#1B1B1B', '#F5F0EB', slide.accentColor].map((c) => (
               <button
                 key={c}
-                onClick={() => set('footerColor', c)}
+                onClick={(e) => setMaybeAll(e, 'footerColor', c)}
                 style={{ background: c, width: 28, height: 28, borderRadius: 6, border: (slide.footerColor ?? '#FFFFFF').toLowerCase() === c.toLowerCase() ? '2.5px solid #5B6CF2' : '2px solid transparent', cursor: 'pointer', outline: '1px solid rgba(0,0,0,0.08)' }}
                 title={c}
               />
@@ -269,7 +284,7 @@ export default function SlideEditor({ slide, onChange }: Props) {
             {['#1B1B1B', '#888888', '#F5F0EB', '#FFFFFF'].map((c) => (
               <button
                 key={c}
-                onClick={() => set('bodyTextColor', c)}
+                onClick={(e) => setMaybeAll(e, 'bodyTextColor', c)}
                 style={{ background: c, width: 28, height: 28, borderRadius: 6, border: (slide.bodyTextColor ?? '').toLowerCase() === c.toLowerCase() ? '2.5px solid #5B6CF2' : '2px solid transparent', cursor: 'pointer', outline: '1px solid rgba(0,0,0,0.08)' }}
                 title={c}
               />
@@ -536,17 +551,23 @@ export default function SlideEditor({ slide, onChange }: Props) {
         <Separator className="my-4" />
 
         <FieldSection title="Apply to All Slides">
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => onChange({ ...slide, _applyBgToAll: true } as any)}>
-              Apply BG
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm"
+              onClick={() => onChange({ ...slide, _applyKeysToAll: ['bgColor', 'textColor', 'accentColor', 'variant'] } as any)}>
+              All colours
             </Button>
-            <Button variant="outline" size="sm" onClick={() => onChange({ ...slide, _applyColorsToAll: true } as any)}>
-              Apply Colors
+            <Button variant="outline" size="sm"
+              onClick={() => onChange({ ...slide, _applyKeysToAll: ['textScale'] } as any)}>
+              Text size
             </Button>
-            <Button variant="outline" size="sm" onClick={() => onChange({ ...slide, _applyTextScaleToAll: true } as any)}>
-              Apply Text Size
+            <Button variant="outline" size="sm"
+              onClick={() => onChange({ ...slide, _applyKeysToAll: ['footerColor', 'bodyTextColor'] } as any)}>
+              Footer + body
             </Button>
           </div>
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Or shift-click any swatch, text size, or slide type above to push just that one to every slide.
+          </p>
         </FieldSection>
 
       </div>

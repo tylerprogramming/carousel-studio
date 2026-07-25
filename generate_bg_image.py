@@ -62,7 +62,26 @@ def upload_reference_image(path, api_key):
     finally:
         os.unlink(tmp_path)
 
-def create_task(prompt, api_key, reference_images=None):
+# Kie.ai image models. "seedance" is the video line; the image line is Seedream.
+MODELS = {
+    "nano-banana-2":   "nano-banana-2",
+    "nano-banana-pro": "nano-banana-pro",
+    "seedream-4.5":    "seedream/4.5-text-to-image",
+    "seedream-5-lite": "seedream/5-lite-text-to-image",
+}
+
+
+def resolve_model(name, has_reference):
+    """Explicit choice wins. Otherwise keep the old behaviour: reference images
+    imply nano-banana-pro for better likeness, everything else nano-banana-2."""
+    if name and name in MODELS:
+        return MODELS[name]
+    if name and "/" in name:
+        return name                     # already a full Kie model id
+    return "nano-banana-pro" if has_reference else "nano-banana-2"
+
+
+def create_task(prompt, api_key, reference_images=None, model_name=None):
     image_input = []
     if reference_images:
         for path in reference_images:
@@ -70,8 +89,7 @@ def create_task(prompt, api_key, reference_images=None):
             if url:
                 image_input.append(url)
                 print(f"  Reference uploaded: {Path(path).name}", flush=True)
-    # Use nano-banana-pro when reference images are provided — better likeness fidelity
-    model = "nano-banana-pro" if image_input else "nano-banana-2"
+    model = resolve_model(model_name, bool(image_input))
     print(f"  Model: {model}", flush=True)
     payload = {
         "model": model,
@@ -135,12 +153,12 @@ def download(url, output_path):
         import subprocess
         subprocess.run(["curl", "-sL", "-o", str(output_path), url], check=True)
 
-def generate(prompt, output_path, reference_images=None):
+def generate(prompt, output_path, reference_images=None, model_name=None):
     api_key = get_api_key()
     if not api_key:
         raise RuntimeError("KIE_API_KEY not found. Add it to .env in the project root.")
     print(f"Creating Kie.ai task...", flush=True)
-    task_id   = create_task(prompt, api_key, reference_images=reference_images)
+    task_id   = create_task(prompt, api_key, reference_images=reference_images, model_name=model_name)
     print(f"Task {task_id} created — polling...", flush=True)
     image_url = poll(task_id, api_key)
     if not image_url:
@@ -155,5 +173,7 @@ if __name__ == "__main__":
     prompt           = data["prompt"]
     output_path      = data["output"]
     reference_images = data.get("referenceImages", [])
-    result           = generate(prompt, output_path, reference_images=reference_images or None)
+    result           = generate(prompt, output_path,
+                                reference_images=reference_images or None,
+                                model_name=data.get("model"))
     print(json.dumps({"path": result}), flush=True)

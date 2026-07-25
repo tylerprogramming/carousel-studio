@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { Slide } from '../types'
 import ImageLibrary from './ImageLibrary'
 import { BG, BLUE, BLUE_HOVER, BLUE_LIGHT, BORDER, CORAL, MUTED, TEXT, WHITE } from '../lib/tokens'
@@ -12,7 +12,19 @@ export interface BgImageCardProps {
   onBgImage: (url: string, scope: 'single' | 'all', slideNumber?: number) => void
   onBgImageEach: (updates: { slideNumber: number; url: string }[]) => void
   onSlideChange: (updated: Slide) => void
+  /** Queues a background job and returns immediately with its id. */
+  startJob: (body: Record<string, unknown>) => Promise<string>
+  runningJobs: { id: string }[]
 }
+
+/** Kie.ai image models. Seedance is the video line; Seedream is the image one. */
+const MODELS: { value: string; label: string; hint: string }[] = [
+  { value: '',                label: 'Auto',         hint: 'Nano Banana Pro when using your likeness, otherwise Nano Banana 2' },
+  { value: 'nano-banana-2',   label: 'Nano Banana 2', hint: 'Fast and cheap. The everyday default.' },
+  { value: 'nano-banana-pro', label: 'Nano Banana Pro', hint: 'Best faces and likeness fidelity.' },
+  { value: 'seedream-4.5',    label: 'Seedream 4.5',  hint: 'Different aesthetic, high detail at 2K/4K.' },
+  { value: 'seedream-5-lite', label: 'Seedream 5 Lite', hint: 'Fastest and cheapest Seedream.' },
+]
 
 // ── SVG Icons ─────────────────────────────────────────────────────────────────
 
@@ -55,88 +67,42 @@ export default function BgImageCard({
   onBgImage,
   onBgImageEach,
   onSlideChange,
+  startJob,
+  runningJobs,
 }: BgImageCardProps) {
   const [scope, setScope]             = useState<ImgScope>('single')
   const [prompt, setPrompt]           = useState('')
+  const [model, setModel]             = useState('')
   const [useLikeness, setUseLikeness] = useState(false)
-  const [generating, setGenerating]   = useState(false)
-  const [progress, setProgress]       = useState('')
   const [error, setError]             = useState('')
+  const [queued, setQueued]           = useState('')
   const [libraryKey, setLibraryKey]   = useState(0)
-  const abortRef = useRef<AbortController | null>(null)
 
-  function handleCancel() {
-    abortRef.current?.abort()
-    abortRef.current = null
-    setGenerating(false)
-    setProgress('')
-  }
+  // Generation is queued on the server, so this panel no longer owns the run.
+  // You can start one and immediately keep editing, switch slides, or reload.
+  const generating = runningJobs.length > 0
 
   async function handleGenerate() {
-    setGenerating(true)
     setError('')
-    setProgress(scope === 'each' ? 'Starting batch...' : 'Generating image...')
-    const abort = new AbortController()
-    abortRef.current = abort
+    setQueued('')
     try {
-      const prefix = `bg_${Date.now()}`
-      const res = await fetch('/api/generate-bg-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: abort.signal,
-        body: JSON.stringify({
-          prompt: prompt.trim(),
-          scope,
-          slides: scope === 'each'
-            ? allSlides.map((s) => ({ slideNumber: s.slideNumber, headline: s.headline, emphasisLine: s.emphasisLine }))
-            : [],
-          outputPrefix: prefix,
-          useLikeness,
-        }),
+      await startJob({
+        prompt: prompt.trim(),
+        scope,
+        model: model || undefined,
+        useLikeness,
+        outputPrefix: `bg_${Date.now()}`,
+        slides: scope === 'each'
+          ? allSlides.map((s) => ({ slideNumber: s.slideNumber, headline: s.headline, emphasisLine: s.emphasisLine }))
+          : [],
       })
-      const reader = res.body!.getReader()
-      const dec = new TextDecoder()
-      const batch: { slideNumber: number; url: string }[] = []
-      let finished = false
-      const finish = (err?: string) => {
-        if (finished) return
-        finished = true
-        reader.cancel().catch(() => {})
-        abortRef.current = null
-        if (err) setError(err)
-        setGenerating(false)
-        setProgress('')
-        setLibraryKey((k) => k + 1)
-      }
-      outer: while (true) {
-        const { done, value } = await reader.read()
-        if (done) { finish(); break }
-        const text = dec.decode(value, { stream: true })
-        for (const line of text.split('\n')) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const evt = JSON.parse(line.slice(6))
-            if (evt.type === 'progress') { setProgress(evt.message) }
-            else if (evt.type === 'error') { finish(evt.message || 'Generation failed'); break outer }
-            else if (evt.type === 'image') {
-              if (scope === 'each') { batch.push({ slideNumber: evt.slideNumber, url: evt.url }); setProgress(`Slide ${evt.slideNumber} done...`) }
-              else {
-                if (scope === 'all') onBgImage(evt.url, 'all')
-                if (scope === 'single') onBgImage(evt.url, 'single', slide.slideNumber)
-              }
-            } else if (evt.type === 'complete') {
-              if (scope === 'each') onBgImageEach(batch)
-              finish()
-              break outer
-            }
-          } catch { /* skip malformed SSE line */ }
-        }
-      }
+      setQueued(scope === 'each'
+        ? `Queued ${allSlides.length} images. They apply as they finish.`
+        : 'Queued. It applies when it finishes.')
+      setLibraryKey((k) => k + 1)
+      setTimeout(() => setLibraryKey((k) => k + 1), 8000)
     } catch (err: any) {
-      if (err?.name !== 'AbortError') setError(String(err))
-      setGenerating(false)
-      setProgress('')
-      abortRef.current = null
+      setError(String(err?.message || err))
     }
   }
 
@@ -379,30 +345,41 @@ export default function BgImageCard({
               if (canGenerate) (e.currentTarget as HTMLElement).style.background = BLUE
             }}
           >
-            {generating ? (
-              <>
-                <SpinnerIcon />
-                {progress || 'Generating...'}
-              </>
-            ) : (
-              <>
-                <SparkleIcon />
-                {scope === 'each' ? `Generate ${allSlides.length} Images` : 'Generate Background'}
-              </>
-            )}
+            <>
+              <SparkleIcon />
+              {scope === 'each' ? `Generate ${allSlides.length} Images` : 'Generate Background'}
+            </>
           </button>
-          {generating && (
-            <button
-              onClick={handleCancel}
-              style={{
-                height: 38, width: 38, borderRadius: 10, flexShrink: 0,
-                border: `1.5px solid #FECACA`, background: '#FFF1F2',
-                color: '#DC2626', fontSize: 16, fontWeight: 700,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-              title="Cancel generation"
-            >×</button>
-          )}
+        </div>
+
+        {queued && (
+          <div style={{
+            background: BLUE_LIGHT, border: `1px solid ${BLUE}33`, borderRadius: 9,
+            padding: '8px 12px', fontSize: 11.5, color: BLUE, marginTop: 8,
+          }}>
+            {queued} Progress is in the bar at the top.
+          </div>
+        )}
+
+        {/* ── Model ─────────────────────────────────────────────────── */}
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+            Model
+          </div>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            style={{
+              width: '100%', padding: '8px 10px', borderRadius: 9,
+              border: `1.5px solid ${BORDER}`, background: BG, color: TEXT,
+              fontSize: 12, fontWeight: 600, outline: 'none', fontFamily: 'inherit',
+            }}
+          >
+            {MODELS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+          <div style={{ fontSize: 10.5, color: MUTED, marginTop: 5, lineHeight: 1.45 }}>
+            {MODELS.find((m) => m.value === model)?.hint}
+          </div>
         </div>
 
         {/* ── Error ─────────────────────────────────────────────────── */}

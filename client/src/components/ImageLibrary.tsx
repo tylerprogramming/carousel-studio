@@ -3,6 +3,10 @@ import { cn } from '../lib/utils'
 import { Label } from './ui/label'
 
 interface LibraryImage {
+  /** 'generated' = made in this app, 'local' = found in the images folder */
+  source?: 'generated' | 'local'
+  /** Subfolder name, used to group local images in the picker */
+  group?: string
   filename: string
   url: string
   size: number
@@ -42,7 +46,9 @@ export default function ImageLibrary({ onApply, compact = false, refreshKey = 0 
     try {
       const res = await fetch('/api/images')
       const data = await res.json()
-      setImages(Array.isArray(data) ? data : [])
+      // The endpoint now returns { imagesDir, images: [...] }; older builds
+      // returned a bare array.
+      setImages(Array.isArray(data) ? data : (data?.images ?? []))
     } finally {
       setLoading(false)
     }
@@ -110,10 +116,11 @@ export default function ImageLibrary({ onApply, compact = false, refreshKey = 0 
                     <img
                       src={img.url}
                       alt={img.filename}
+                title={img.group ? `${img.group} / ${img.filename}` : img.filename}
                       className="w-full h-full object-cover block"
                     />
 
-                    {hover === img.filename && (
+                    {hover === img.filename && img.source !== 'local' && (
                       <div className="absolute inset-0 bg-black/55 flex flex-col items-center justify-center gap-1.5">
                         <button
                           onClick={(e) => { e.stopPropagation(); onApply(img.url) }}

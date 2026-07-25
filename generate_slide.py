@@ -8,6 +8,7 @@ component. If you change one, change the other.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -211,6 +212,15 @@ def zoom_crop(img, box_w, box_h, zoom, pan_x, pan_y):
 
 MONO_FONTS = ['/System/Library/Fonts/Menlo.ttc', '/System/Library/Fonts/Monaco.ttf']
 
+# Anything outside this set renders as a tofu box in a mono face. The server
+# already scrubs generated text; this is the last line of defence for hand-typed
+# or older saved carousels.
+_MONO_OK = re.compile(r'[^\x20-\x7E\u2713\u2192\u2014]')
+
+
+def mono_safe(text: str) -> str:
+    return _MONO_OK.sub('', (text or '').replace('\t', ' ')).rstrip()
+
 
 def load_mono(size: int) -> ImageFont.FreeTypeFont:
     for p in MONO_FONTS:
@@ -290,10 +300,10 @@ def generate_terminal_slide(data):
         for i, c in enumerate([(255, 95, 86), (255, 189, 46), (39, 201, 63)]):
             cx = PADX + 24 + i * 25
             d.ellipse([cx, win_top + 23, cx + 15, win_top + 38], fill=c)
-        d.text((PADX + 24 + 3 * 25 + 20, win_top + 18), data.get('terminalTitle') or 'claude',
+        d.text((PADX + 24 + 3 * 25 + 20, win_top + 18), mono_safe(data.get('terminalTitle')) or 'claude',
                font=load_mono(24), fill=dim)
         ly = win_top + 62 + 26
-        for ln in lines:
+        for ln in [mono_safe(l) for l in lines]:
             col = fg if ln.startswith('$') else ((110, 220, 140) if ln.lstrip().startswith('✓') else dim)
             d.text((PADX + 30, ly), ln, font=f_line, fill=col)
             ly += line_h

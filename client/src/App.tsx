@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Slide, CarouselConfig, defaultSlides, genId } from './types'
 import { useIsMobile } from './hooks/useMediaQuery'
 import { useHistory } from './hooks/useHistory'
+import { useJobs, Job } from './hooks/useJobs'
 import { cn } from './lib/utils'
 import SlideList from './components/SlideList'
 import SlideEditor from './components/SlideEditor'
@@ -13,6 +14,7 @@ import SavedCarouselsDrawer from './components/SavedCarouselsDrawer'
 import BatchModal from './components/BatchModal'
 import CaptionModal from './components/CaptionModal'
 import ExportsGallery from './components/ExportsGallery'
+import JobStrip from './components/JobStrip'
 import TikTokPanel from './components/TikTokPanel'
 import {
   AppLogo, IgLogo, LiLogo, TikTokLogo, FolderIcon, SparkleIcon, BoltIcon,
@@ -127,24 +129,22 @@ export default function App() {
   }
 
   function updateSlide(updated: Slide) {
-    // SlideEditor signals "apply this to every slide" with a transient flag on
-    // the slide object rather than a separate callback.
-    const bulk = [
-      ['_applyBgToAll',        (s: Slide, c: Slide) => ({ ...s, bgColor: c.bgColor })],
-      // Themes can carry a layout variant, so that has to travel with the colours
-      ['_applyColorsToAll',    (s: Slide, c: Slide) => ({ ...s, bgColor: c.bgColor, textColor: c.textColor, accentColor: c.accentColor, variant: c.variant })],
-      ['_applyTextScaleToAll', (s: Slide, c: Slide) => ({ ...s, textScale: c.textScale })],
-    ] as const
-
-    for (const [flag, apply] of bulk) {
-      if ((updated as any)[flag]) {
-        const { [flag]: _, ...clean } = updated as any
-        setConfig((c) => ({
-          ...c,
-          slides: c.slides.map((s, i) => (i === activeIndex ? clean : apply(s, clean))),
-        }), { coalesce: false })
-        return
-      }
+    // SlideEditor signals "apply this to every slide" by tagging the slide with
+    // the keys to propagate, rather than a flag per control. Shift-clicking any
+    // control in the editor sets this.
+    const keys = (updated as any)._applyKeysToAll as (keyof Slide)[] | undefined
+    if (keys?.length) {
+      const { _applyKeysToAll, ...clean } = updated as any
+      setConfig((c) => ({
+        ...c,
+        slides: c.slides.map((s, i) => {
+          if (i === activeIndex) return clean
+          const patch: Partial<Slide> = {}
+          for (const k of keys) (patch as any)[k] = (clean as any)[k]
+          return { ...s, ...patch }
+        }),
+      }), { coalesce: false })
+      return
     }
     setConfig((c) => ({ ...c, slides: c.slides.map((s, i) => (i === activeIndex ? updated : s)) }))
   }
@@ -226,6 +226,22 @@ export default function App() {
       }),
     }), { coalesce: false })
   }
+
+  // A finished background job applies itself. Results carry their carouselId,
+  // so a job started before switching carousels can never land on the wrong one.
+  const applyJob = useCallback((job: Job) => {
+    if (!job.results.length) return
+    setConfig((c) => ({
+      ...c,
+      slides: c.slides.map((s) => {
+        if (job.scope === 'all') return { ...s, backgroundImage: job.results[0].url }
+        const hit = job.results.find((r) => r.slideNumber === s.slideNumber)
+        return hit ? { ...s, backgroundImage: hit.url } : s
+      }),
+    }), { coalesce: false })
+  }, [setConfig])
+
+  const { jobs, running, start: startJob, cancel: cancelJob } = useJobs(carouselId, applyJob)
 
   const handleExport = useCallback(async () => {
     setExporting(true); setExportMsg(''); setExportedUrls([])
@@ -523,6 +539,7 @@ export default function App() {
       {showCaptions && <CaptionModal onClose={() => setShowCaptions(false)} config={config} slug={slugify(config.title)} />}
 
       {header}
+      <JobStrip jobs={running} onCancel={cancelJob} />
       {exportToast}
 
       {!isMobile && (
@@ -546,6 +563,7 @@ export default function App() {
                 <BgImageCard
                   slide={activeSlide} allSlides={config.slides}
                   onBgImage={applyBgImage} onBgImageEach={applyBgImageEach} onSlideChange={updateSlide}
+                  startJob={startJob} runningJobs={running}
                 />
               )}
               <div className="flex min-w-[300px] flex-[1_1_340px] flex-col overflow-hidden bg-background">
@@ -655,6 +673,7 @@ export default function App() {
                 <BgImageCard
                   slide={activeSlide} allSlides={config.slides}
                   onBgImage={applyBgImage} onBgImageEach={applyBgImageEach} onSlideChange={updateSlide}
+                  startJob={startJob} runningJobs={running}
                 />
               </div>
             )}
