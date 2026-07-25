@@ -54,7 +54,15 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
   const [exported, setExported] = useState<{
     videos: { filename: string; url: string }[]
     tiktokSlides: string[]
-  }>({ videos: [], tiktokSlides: [] })
+    stale: boolean
+  }>({ videos: [], tiktokSlides: [], stale: false })
+
+  // Clicking an exported video plays it in the phone frame on the right, which
+  // is already a 9:16 display, instead of throwing you into a browser tab.
+  const [playingUrl, setPlayingUrl] = useState<string | null>(null)
+  // The slide is inset to the safe area, but it is padded with the slide's own
+  // background colour, so the inset is invisible. This outlines it.
+  const [showGuide, setShowGuide] = useState(true)
 
   const slug = exportSlug(carouselTitle)
   const loadExported = useCallback(async () => {
@@ -65,6 +73,9 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
       setExported({
         videos: match?.videos ?? [],
         tiktokSlides: match?.variants?.tiktok?.slides ?? [],
+        // Re-exporting refreshes the 4:5 set and leaves the reframed one
+        // behind, so the two disagree with nothing to show for it.
+        stale: !!match?.staleVariants?.includes('tiktok'),
       })
     } catch { /* leave empty */ }
   }, [slug])
@@ -155,15 +166,20 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
           clicking a tile opens it full size in a new tab. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}>
         {exported.videos.map((v) => (
-          <a key={v.url} href={v.url} target="_blank" rel="noreferrer" title={`${v.filename} — click to open`}
-             style={{ position: 'relative', display: 'block', borderRadius: 6, overflow: 'hidden', border: `1px solid ${TIKTOK}` }}>
+          <button key={v.url} onClick={() => setPlayingUrl(playingUrl === v.url ? null : v.url)}
+                  title={`${v.filename} — plays in the phone`}
+                  style={{
+                    position: 'relative', display: 'block', padding: 0, cursor: 'pointer',
+                    borderRadius: 6, overflow: 'hidden', background: 'none',
+                    border: `2px solid ${playingUrl === v.url ? TIKTOK : BORDER}`,
+                  }}>
             <video src={v.url} autoPlay loop muted playsInline
                    style={{ width: '100%', aspectRatio: '9 / 16', objectFit: 'cover', display: 'block' }} />
             <span style={{
               position: 'absolute', bottom: 2, right: 2, background: TIKTOK, color: WHITE,
               fontSize: 8, fontWeight: 800, borderRadius: 3, padding: '1px 3px',
             }}>MP4</span>
-          </a>
+          </button>
         ))}
         {exported.tiktokSlides.map((url, i) => (
           <a key={url} href={url} target="_blank" rel="noreferrer" title={`Slide ${i + 1}`}
@@ -178,6 +194,16 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
         {exported.videos.length > 0 && `${exported.videos.length} video · `}
         {exported.tiktokSlides.length} reframed slides (1080x1920)
       </div>
+
+      {exported.stale && (
+        <div style={{
+          marginTop: 6, padding: '6px 8px', borderRadius: 6,
+          background: '#FEE9E3', color: '#B4432B', fontSize: 10, lineHeight: 1.45,
+        }}>
+          These are older than the main export. Rebuild the TikTok set before
+          posting, or you will ship slides you have since changed.
+        </div>
+      )}
     </div>
   )
 
@@ -327,8 +353,22 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
 
       {/* ── Right: big TikTok phone ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: 20 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 14 }}>
-          TikTok Preview
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            {playingUrl ? 'Playing export' : 'TikTok Preview'}
+          </span>
+          {playingUrl ? (
+            <button onClick={() => setPlayingUrl(null)}
+                    style={{ fontSize: 10, fontWeight: 700, color: TIKTOK, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              back to slide
+            </button>
+          ) : (
+            <button onClick={() => setShowGuide((v) => !v)}
+                    title="The slide is inset to clear TikTok's caption and action rail. The padding is the slide's own colour, so this outlines it."
+                    style={{ fontSize: 10, fontWeight: 700, color: showGuide ? TIKTOK : MUTED, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              safe area
+            </button>
+          )}
         </div>
 
         {/* Phone frame */}
@@ -348,9 +388,22 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
             background: slide?.bgColor ?? '#111', position: 'relative', flexShrink: 0,
           }}>
             {/* Live slide preview (uses TT text, not carousel text) */}
-            <div style={{ position: 'absolute', left: slideLeft, top: slideTop, width: SLIDE_W, height: SLIDE_H, overflow: 'hidden' }}>
-              {previewSlide && <SlidePreview slide={previewSlide} scale={SCALE} totalSlides={slides.length} />}
-            </div>
+            {playingUrl ? (
+              <video src={playingUrl} controls autoPlay loop playsInline
+                     style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000' }} />
+            ) : (
+              <>
+                <div style={{ position: 'absolute', left: slideLeft, top: slideTop, width: SLIDE_W, height: SLIDE_H, overflow: 'hidden' }}>
+                  {previewSlide && <SlidePreview slide={previewSlide} scale={SCALE} totalSlides={slides.length} />}
+                </div>
+                {showGuide && (
+                  <div style={{
+                    position: 'absolute', left: slideLeft, top: slideTop, width: SLIDE_W, height: SLIDE_H,
+                    border: '1px dashed rgba(255,255,255,0.35)', pointerEvents: 'none', zIndex: 5,
+                  }} />
+                )}
+              </>
+            )}
 
             {/* TikTok UI overlay */}
             <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
