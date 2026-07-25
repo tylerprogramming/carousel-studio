@@ -1214,10 +1214,15 @@ app.delete('/api/images/:filename', (c) => {
 // ── Static file serving ───────────────────────────────────────────────────────
 
 // Serve exported carousel output from <exportDir>/<slug>/
-app.get('/carousel-output/:slug/:filename', async (c) => {
-  const { slug, filename } = c.req.param()
-  const filePath = resolveMediaPath(`/carousel-output/${slug}/${filename}`)
+// Wildcard, not :slug/:filename — a platform variant lives one level deeper
+// (<slug>/tiktok/slide_1.png) and a two-segment route silently fell through to
+// the SPA, answering an <img> with index.html. resolveMediaPath still blocks
+// anything escaping the export directory.
+app.get('/carousel-output/*', async (c) => {
+  const rel = new URL(c.req.url).pathname.slice('/carousel-output/'.length)
+  const filePath = resolveMediaPath(`/carousel-output/${rel}`)
   if (!filePath) return c.text('Not found', 404)
+  const filename = rel.split('/').pop() || rel
   const file = Bun.file(filePath)
   const contentType = mediaType(filename)
   const disposition = contentType === 'application/pdf'
