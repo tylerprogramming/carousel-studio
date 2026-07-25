@@ -483,13 +483,15 @@ def _draw_list_content(draw, cfg: dict, mode: str = "cream"):
             fy += line_h(small, l) + 10
         fy += 10
 
-    # skool URL + "· Link in bio" on one line
-    skool_str = "skool.com/the-ai-agency"
-    sep_str   = "  ·  Link in bio"
-    draw.text((PAD, fy), skool_str, font=link, fill=LINK_C)
-    skool_w = dummy.textbbox((0,0), skool_str, font=link)[2]
-    draw.text((PAD + skool_w, fy), sep_str, font=small, fill=footer_text_c)
-    fy += line_h(link, skool_str) + 24
+    # Community/link line. Comes from the payload so nothing personal is baked
+    # into the app; callers pass settings.json's `communityUrl`.
+    skool_str = cfg.get("communityUrl") or ""
+    if skool_str:
+        sep_str = "  ·  Link in bio"
+        draw.text((PAD, fy), skool_str, font=link, fill=LINK_C)
+        skool_w = dummy.textbbox((0,0), skool_str, font=link)[2]
+        draw.text((PAD + skool_w, fy), sep_str, font=small, fill=footer_text_c)
+        fy += line_h(link, skool_str) + 24
 
     # Handle on its own line, left-aligned so it never overlaps
     hfont    = load_font(44, bold=False)

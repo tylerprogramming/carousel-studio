@@ -1,13 +1,9 @@
 {
   "_comment": "Copy to settings.json and edit. Every field is optional.",
-
   "handle": "@yourhandle",
-
   "brandVoice": "Optional. A sentence or two describing how your captions should sound, e.g. 'Blunt and practical. No hype. Short sentences.' Appended to the caption system prompt.",
-
   "exportDir": "Optional. Where exported carousels are written. Defaults to ./exports. Supports ~ for your home directory.",
-
   "likenessPath": "Optional. Absolute path to a photo of you, used as a reference image when 'Use my likeness' is checked.",
-
-  "likenessDescription": "Optional. Appended to the image prompt so the model gets your appearance right, e.g. 'The person in the image is a young adult male. Always generate a male person, not female.'"
+  "likenessDescription": "Optional. Appended to the image prompt so the model gets your appearance right, e.g. 'The person in the image is a young adult male. Always generate a male person, not female.'",
+  "communityUrl": "Optional. Community or link-in-bio URL shown on flash-video footers, e.g. 'skool.com/your-community'. Left blank, the line is omitted."
 }
