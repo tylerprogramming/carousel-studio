@@ -131,6 +131,9 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
       {lines.length > 0 && (
         <div style={{
           position: 'absolute', left: PAD, right: PAD, top: s(700),
+          // Mirrors generate_slide.py: the window must clear the footer once
+          // wrapped lines make it taller.
+          maxHeight: s(1350 - 130) - s(700),
           background: '#0B0D12', borderRadius: s(16), overflow: 'hidden',
           border: '1px solid rgba(255,255,255,0.07)',
         }}>

@@ -356,7 +356,27 @@ def generate_terminal_slide(data):
         win_top = 700
         f_line = load_mono(fs(29))
         line_h = round(fs(29) * 1.9)
-        win_h = 62 + 26 * 2 + line_h * len(lines)
+        # Terminal lines wrap, matching whiteSpace: pre-wrap in SlidePreview.
+        # Without this a long line was simply cut off at the window edge, which
+        # only showed up once the type got bigger.
+        avail_w = (WIDTH - PADX * 2) - 60
+        wrapped = []
+        for raw in [mono_safe(l) for l in lines]:
+            pieces = wrap_text(d, raw, f_line, avail_w) or ['']
+            # Continuation lines are indented so a wrapped command still reads
+            # as one command rather than a new line of output.
+            wrapped.append((pieces[0], raw))
+            for extra in pieces[1:]:
+                wrapped.append(('  ' + extra, raw))
+        win_h = 62 + 26 * 2 + line_h * len(wrapped)
+        # Wrapping makes the window taller, and at 700 it grew straight through
+        # the footer. Lift it so it always clears, with a floor so it cannot
+        # ride up into the headline.
+        # Floor is where the text above actually ended, not a fixed number:
+        # at a larger textScale the headline and emphasis take more room, and a
+        # magic floor let the window ride up over them.
+        FOOTER_TOP = HEIGHT - 130
+        win_top = max(y + 40, min(win_top, FOOTER_TOP - win_h))
         d.rounded_rectangle([PADX, win_top, WIDTH - PADX, win_top + win_h], radius=16, fill=(11, 13, 18))
         d.rounded_rectangle([PADX, win_top, WIDTH - PADX, win_top + 62], radius=16, fill=(35, 39, 47))
         d.rectangle([PADX, win_top + 40, WIDTH - PADX, win_top + 62], fill=(35, 39, 47))
@@ -366,9 +386,10 @@ def generate_terminal_slide(data):
         d.text((PADX + 24 + 3 * 25 + 20, win_top + 18), mono_safe(data.get('terminalTitle')) or 'claude',
                font=load_mono(24), fill=dim)
         ly = win_top + 62 + 26
-        for ln in [mono_safe(l) for l in lines]:
-            col = fg if ln[:1] in ('$', '>') else ((110, 220, 140) if ln.lstrip().startswith('✓') else dim)
-            d.text((PADX + 30, ly), ln, font=f_line, fill=col)
+        for text, source in wrapped:
+            # Colour follows the original line, so a wrapped command stays white
+            col = fg if source[:1] in ('$', '>') else ((110, 220, 140) if source.lstrip().startswith('✓') else dim)
+            d.text((PADX + 30, ly), text, font=f_line, fill=col)
             ly += line_h
     if (data.get('bodyText') or '').strip():
         body_font = load_mono(fs(32))

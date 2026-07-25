@@ -881,6 +881,9 @@ app.post('/api/summary-slide', async (c) => {
   const {
     carouselId, headline, emphasisLine, points: override, save = false,
     video: makeVideo = false, videoSeconds = 5, audio,
+    // A card read for five seconds on a phone needs bigger type than one you
+    // can stop and pinch-zoom, so video defaults larger than the still.
+    textScale, videoMargin = 55 / 1080,
   } = await c.req.json()
   const path = join(CAROUSELS_DIR, `${carouselId}.json`)
   if (!existsSync(path)) return c.json({ error: 'Carousel not found' }, 404)
@@ -911,6 +914,7 @@ app.post('/api/summary-slide', async (c) => {
     accentColor: cover.accentColor || '#E07355',
     terminalTitle: 'summary',
     terminalLines: points.map((p, i) => `${i + 1}. ${p}`),
+    textScale: textScale ?? (makeVideo ? 1.3 : 1.0),
   }
 
   const slug = slugFromTitle(carousel.title)
@@ -936,8 +940,11 @@ app.post('/api/summary-slide', async (c) => {
   let hasAudio = false
   if (makeVideo) {
     const framed = join(slugDir, 'summary-tiktok.png')
+    // Tighter margin than a swipeable carousel: a single card has no
+    // neighbouring slides to clear, so it can use more of the frame.
     const p1 = Bun.spawn(['python3', join(import.meta.dir, 'tiktok_safe.py'), JSON.stringify({
       input: outputPath, output: framed, bgColor: summary.bgColor,
+      margin: Math.round(videoMargin * 1080),
     })], { stdout: 'ignore', stderr: 'pipe' })
     const [c1, e1] = await Promise.all([p1.exited, new Response(p1.stderr).text()])
     if (c1 !== 0) return c.json({ error: `summary reframe failed: ${e1}` }, 500)
