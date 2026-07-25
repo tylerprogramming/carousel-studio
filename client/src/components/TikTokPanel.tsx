@@ -64,6 +64,16 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
   // background colour, so the inset is invisible. This outlines it.
   const [showGuide, setShowGuide] = useState(true)
 
+  // Re-measure on resize so the preview keeps filling the window
+  const [viewportH, setViewportH] = useState(
+    typeof window === 'undefined' ? 900 : window.innerHeight,
+  )
+  useEffect(() => {
+    const onResize = () => setViewportH(window.innerHeight)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   const slug = exportSlug(carouselTitle)
   const loadExported = useCallback(async () => {
     try {
@@ -146,8 +156,10 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
   }, [slide, style, duration, ttText, carouselId])
 
   // Phone: fill available space, 9:16 ratio
-  const PHONE_W = 360
-  const PHONE_H = Math.round(PHONE_W * 16 / 9)
+  // Size the phone from the window, the way the Instagram preview fills its
+  // space. A 9:16 frame at a fixed 360px looked tiny next to the 4:5 one.
+  const PHONE_H = Math.min(880, Math.max(520, viewportH - 190))
+  const PHONE_W = Math.round(PHONE_H * 9 / 16)
   // Inset to the TikTok safe area, matching tiktok_safe.py, so this shows the
   // exported framing rather than a full-bleed slide TikTok would cover with
   // its own UI. This is the preview that renders when TikTok is selected.
@@ -410,7 +422,7 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
               <div style={{ position: 'absolute', top: 13, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
                 <span style={{ color: WHITE, fontSize: 13, fontWeight: 700, textShadow: '0 1px 5px rgba(0,0,0,0.9)' }}>For You</span>
               </div>
-              <div style={{ position: 'absolute', right: 7, bottom: 90, display: 'flex', flexDirection: 'column', gap: 18, alignItems: 'center' }}>
+              <div style={{ position: 'absolute', right: Math.round(PHONE_W * 0.02), bottom: Math.round(PHONE_H * 0.14), display: 'flex', flexDirection: 'column', gap: Math.round(PHONE_H * 0.028), alignItems: 'center' }}>
                 {[{ icon: '❤️', count: '24K' }, { icon: '💬', count: '312' }, { icon: '↗️', count: 'Share' }].map((item, i) => (
                   <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                     <div style={{ fontSize: 22, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.8))' }}>{item.icon}</div>
@@ -418,7 +430,7 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
                   </div>
                 ))}
               </div>
-              <div style={{ position: 'absolute', bottom: 14, left: 10, right: 50 }}>
+              <div style={{ position: 'absolute', bottom: Math.round(PHONE_H * 0.022), left: Math.round(PHONE_W * 0.028), right: Math.round(PHONE_W * 0.14) }}>
                 <div style={{ color: WHITE, fontSize: 12, fontWeight: 700, textShadow: '0 1px 4px rgba(0,0,0,0.9)', marginBottom: 2 }}>{handle}</div>
                 <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 10, textShadow: '0 1px 3px rgba(0,0,0,0.9)', lineHeight: 1.4, marginBottom: 4 }}>
                   {ttText.headline.slice(0, 55)}
