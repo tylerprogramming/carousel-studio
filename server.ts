@@ -233,7 +233,7 @@ function cleanMono(s: unknown): string {
     .replace(/[✓✔]/g, '✓')      // normalise both check marks
     .replace(/[\t\r\n]+/g, ' ')                // tabs/newlines break the layout
     // eslint-disable-next-line no-control-regex
-    .replace(/[ -]/g, '')     // control characters
+    .replace(/[\x00-\x1F\x7F]/g, '')      // control characters
     .replace(/[^\x20-\x7E✓→—]/g, '') // ASCII plus check, arrow, em dash
     .replace(/ {2,}(?=\S)/g, (m) => (m.length > 4 ? '  ' : m)) // collapse runaway padding
     .trimEnd()
@@ -499,6 +499,30 @@ Write captions for this carousel.`
 
 type JobResult = { slideNumber?: number; url: string; filename: string }
 
+/**
+ * Prompt for a single slide in an "each slide" run. The user's prompt becomes
+ * the style layer; the slide's own headline and emphasis line supply the subject,
+ * which is why that scope needs no per-slide prompt writing.
+ */
+function buildAutoPrompt(slide: any, basePrompt: string): string {
+  const topic = [slide.headline, slide.emphasisLine].filter(Boolean).join(' - ')
+  const base  = basePrompt?.trim() ? `${basePrompt}. ` : ''
+  return `${base}Abstract background image for a carousel slide about: "${topic}". Modern, minimal, clean aesthetic. No text, no people. Geometric shapes, soft gradients, professional.`
+}
+
+/** Filesystem-safe fragment of a title or prompt. */
+function slugFragment(text: string, words = 4): string {
+  return (text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, words)
+    .join('-')
+    .slice(0, 48)
+}
+
 interface Job {
   id: string
   kind: 'bg-image'
@@ -564,9 +588,8 @@ app.delete('/api/jobs/:id', (c) => {
 // Returns { jobId } straight away.
 app.post('/api/jobs/generate-bg', async (c) => {
   const {
-    prompt, scope = 'single', slides = [], carouselId,
+    prompt, scope = 'single', slides = [], carouselId, carouselTitle,
     model, useLikeness = false, referenceImages = [],
-    outputPrefix = `bg_${Date.now()}`,
   } = await c.req.json()
 
   loadEnv()
@@ -600,16 +623,32 @@ app.post('/api/jobs/generate-bg', async (c) => {
 
   const bgScript = join(import.meta.dir, 'generate_bg_image.py')
 
+  // Images are filed by what they are for, not when they were made: one folder
+  // per carousel, and a filename describing the slide and the prompt.
+  const folder = slugFragment(carouselTitle || '', 6) || 'unsorted'
+  const destDir = join(imagesDir(), folder)
+  mkdirSync(destDir, { recursive: true })
+  const promptSlug = slugFragment(prompt || '', 4) || 'background'
+
+  const nameFor = (slideNumber?: number) => {
+    const base = slideNumber != null
+      ? `slide-${String(slideNumber).padStart(2, '0')}-${promptSlug}`
+      : scope === 'all' ? `all-slides-${promptSlug}` : `${promptSlug}`
+    // Never clobber an earlier take of the same idea
+    let name = `${base}.png`
+    let n = 2
+    while (existsSync(join(destDir, name))) name = `${base}-${n++}.png`
+    return name
+  }
+
   // Deliberately not awaited — the response goes back now.
   ;(async () => {
     await Promise.all(targets.map(async (slide: any) => {
       if (job.cancelled) return
-      const filename = slide
-        ? `${outputPrefix}_slide${slide.slideNumber}.png`
-        : `${outputPrefix}.png`
+      const filename = nameFor(slide?.slideNumber)
       const payload = JSON.stringify({
         prompt: slide ? buildAutoPrompt(slide, finalPrompt) : finalPrompt,
-        output: join(OUTPUT_DIR, filename),
+        output: join(destDir, filename),
         referenceImages: refs,
         model,
       })
@@ -621,7 +660,11 @@ app.post('/api/jobs/generate-bg', async (c) => {
         if (code !== 0) {
           job.errors.push(`${slide ? `Slide ${slide.slideNumber}: ` : ''}${await new Response(proc.stderr).text()}`.slice(0, 400))
         } else {
-          job.results.push({ slideNumber: slide?.slideNumber, url: `/files/${filename}`, filename })
+          job.results.push({
+            slideNumber: slide?.slideNumber,
+            url: `/local-images/${encodeURIComponent(folder)}/${encodeURIComponent(filename)}`,
+            filename,
+          })
         }
       } finally {
         job.procs.delete(proc as any)
@@ -637,102 +680,6 @@ app.post('/api/jobs/generate-bg', async (c) => {
   return c.json({ jobId: job.id, job: publicJob(job) })
 })
 
-// ── Background Image Generation ───────────────────────────────────────────────
-
-// POST /api/generate-bg-image
-// scope: 'single' | 'all' | 'each'
-// For 'single'/'all': one image, one prompt
-// For 'each': auto-prompts per slide, generates N images → SSE stream
-app.post('/api/generate-bg-image', async (c) => {
-  const { prompt, scope, slides = [], outputPrefix = `bg_${Date.now()}`, useLikeness = false, referenceImages = [] } = await c.req.json()
-  const settings = readSettings()
-  const refs: string[] = [...referenceImages]
-  if (useLikeness && settings.likenessPath && existsSync(settings.likenessPath)) refs.unshift(settings.likenessPath)
-
-  // When using likeness, append person description to prompt so the model generates the right gender/look
-  const likenessHint = useLikeness && settings.likenessDescription ? ` ${settings.likenessDescription}` : ''
-  const finalPrompt = prompt ? `${prompt}${likenessHint}` : prompt
-
-  if (!process.env.KIE_API_KEY) {
-    return c.json({ error: 'KIE_API_KEY not set. Add it to .env in the project root.' }, 400)
-  }
-
-  const bgScript = join(import.meta.dir, 'generate_bg_image.py')
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (obj: object) =>
-        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(obj)}\n\n`))
-
-      try {
-        if (scope === 'each' && slides.length > 0) {
-          // One image per slide, generated concurrently — a 7-slide set used to be
-          // 7 serial Kie.ai round trips. Results stream back as each one lands, so
-          // they may arrive out of slide order; every event carries its slideNumber.
-          for (const slide of slides) {
-            send({ type: 'progress', slideNumber: slide.slideNumber, message: `Generating slide ${slide.slideNumber}...` })
-          }
-
-          await Promise.all(slides.map(async (slide: any) => {
-            const autoPrompt = buildAutoPrompt(slide, finalPrompt)
-            const filename   = `${outputPrefix}_slide${slide.slideNumber}.png`
-            const outputPath = join(OUTPUT_DIR, filename)
-            const payload    = JSON.stringify({ prompt: autoPrompt, output: outputPath, referenceImages: refs })
-
-            const proc      = Bun.spawn(['python3', bgScript, payload], { stdout: 'pipe', stderr: 'pipe' })
-            const exitCode  = await proc.exited
-            if (exitCode !== 0) {
-              const stderr = await new Response(proc.stderr).text()
-              send({ type: 'error', slideNumber: slide.slideNumber, message: stderr })
-              return
-            }
-            send({ type: 'image', slideNumber: slide.slideNumber, url: `/files/${filename}`, filename })
-          }))
-          send({ type: 'complete' })
-
-        } else {
-          // Single or All: one image
-          if (!finalPrompt?.trim()) { send({ type: 'error', message: 'prompt is required' }); controller.close(); return }
-          const filename   = `${outputPrefix}.png`
-          const outputPath = join(OUTPUT_DIR, filename)
-          const payload    = JSON.stringify({ prompt: finalPrompt, output: outputPath, referenceImages: refs })
-
-          send({ type: 'progress', message: 'Generating background image...' })
-
-          const proc     = Bun.spawn(['python3', bgScript, payload], { stdout: 'pipe', stderr: 'pipe' })
-          const exitCode = await proc.exited
-          if (exitCode !== 0) {
-            const stderr = await new Response(proc.stderr).text()
-            send({ type: 'error', message: stderr })
-          } else {
-            send({ type: 'image', url: `/files/${filename}`, filename })
-            send({ type: 'complete' })
-          }
-        }
-      } catch (err) {
-        send({ type: 'error', message: String(err) })
-      } finally {
-        controller.close()
-      }
-    },
-  })
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type':  'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection':    'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-    },
-  })
-})
-
-function buildAutoPrompt(slide: any, basePrompt: string): string {
-  const topic = [slide.headline, slide.emphasisLine].filter(Boolean).join(' - ')
-  const base  = basePrompt?.trim() ? `${basePrompt}. ` : ''
-  return `${base}Abstract background image for Instagram carousel slide about: "${topic}". Modern, minimal, clean aesthetic. No text, no people. Geometric shapes, soft gradients, professional.`
-}
-
 // ── PIL Slide Generation ───────────────────────────────────────────────────────
 
 app.post('/api/generate-slide', async (c) => {
@@ -741,7 +688,7 @@ app.post('/api/generate-slide', async (c) => {
 
   const filename = `slide_${slideId || Date.now()}.png`
   const outputPath = join(OUTPUT_DIR, filename)
-  const payload = JSON.stringify({ ...slideData, output: outputPath })
+  const payload = JSON.stringify({ ...slideData, handle: creatorHandle(), output: outputPath })
   const scriptPath = join(import.meta.dir, 'generate_slide.py')
 
   const proc = Bun.spawn(['python3', scriptPath, payload], { stdout: 'pipe', stderr: 'pipe' })
@@ -771,6 +718,7 @@ app.post('/api/export-all', async (c) => {
     const payload = JSON.stringify({
       ...slide,
       totalSlides:        slides.length,
+      handle:             creatorHandle(),
       backgroundImagePath: resolveMediaPath(slide.backgroundImage) ?? undefined,
       backgroundVideoPath: resolveMediaPath(slide.backgroundVideo) ?? undefined,
       insetImagePath:      resolveMediaPath(slide.insetImageUrl) ?? undefined,

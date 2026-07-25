@@ -5,9 +5,9 @@ import { useHistory } from './hooks/useHistory'
 import { useJobs, Job } from './hooks/useJobs'
 import { cn } from './lib/utils'
 import SlideList from './components/SlideList'
+import Inspector from './components/Inspector'
 import SlideEditor from './components/SlideEditor'
 import SlidePreview from './components/SlidePreview'
-import BgImageCard from './components/BgImageCard'
 import InstagramPreview from './components/InstagramPreview'
 import GenerateModal from './components/GenerateModal'
 import SavedCarouselsDrawer from './components/SavedCarouselsDrawer'
@@ -241,7 +241,7 @@ export default function App() {
     }), { coalesce: false })
   }, [setConfig])
 
-  const { jobs, running, start: startJob, cancel: cancelJob } = useJobs(carouselId, applyJob)
+  const { jobs, running, start: startJob, cancel: cancelJob } = useJobs(carouselId, config.title, applyJob)
 
   const handleExport = useCallback(async () => {
     setExporting(true); setExportMsg(''); setExportedUrls([])
@@ -296,95 +296,31 @@ export default function App() {
   const activeSlide = config.slides[activeIndex]
 
   // ── Controls bar ────────────────────────────────────────────────────────────
+  // Actions live in the header now. What stays here is the export format, which
+  // belongs next to the preview it describes.
   const controlsPanel = (
-    <div className="flex shrink-0 flex-col gap-2.5 border-b border-border bg-card p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setShowSaved(true)}
-          className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-brand hover:bg-brand-light hover:text-brand"
-        >
-          <FolderIcon /> Library
-        </button>
-
-        <button
-          onClick={() => setShowExports(true)}
-          title="Browse carousels already exported to this machine"
-          className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-brand hover:bg-brand-light hover:text-brand"
-        >
-          <FolderIcon /> Exports
-        </button>
-
-        <div className="flex items-center gap-0.5 rounded-lg border-[1.5px] border-border bg-secondary p-0.5">
+    <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-4 py-2.5">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+        Export as
+      </span>
+      <div className="flex gap-0.5 rounded-lg border-[1.5px] border-border bg-secondary p-[3px]">
+        {(['png', 'pdf', 'both'] as const).map((f) => (
           <button
-            onClick={undo}
-            disabled={!canUndo}
-            title="Undo (⌘Z)"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors enabled:hover:bg-card enabled:hover:text-brand disabled:opacity-30"
+            key={f}
+            onClick={() => setExportFormat(f)}
+            className={cn(
+              'rounded-md px-2.5 py-[3px] text-[10px] font-bold uppercase tracking-[0.05em] transition-all',
+              exportFormat === f ? 'bg-card text-foreground shadow-soft' : 'text-muted-foreground hover:text-foreground',
+            )}
           >
-            <UndoIcon />
+            {f === 'both' ? 'PNG+PDF' : f.toUpperCase()}
           </button>
-          <button
-            onClick={redo}
-            disabled={!canRedo}
-            title="Redo (⇧⌘Z)"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors enabled:hover:bg-card enabled:hover:text-brand disabled:opacity-30"
-          >
-            <RedoIcon />
-          </button>
-        </div>
-
-        <div className="flex-1" />
-
-        <button
-          onClick={() => setShowCaptions(true)}
-          className="flex items-center gap-1.5 rounded-[9px] border-[1.5px] border-coral/40 bg-coral-light px-3.5 py-[7px] text-xs font-bold text-coral-dark transition-all hover:bg-coral hover:text-white"
-        >
-          Captions
-        </button>
-
-        <button
-          onClick={() => setShowGenerate(true)}
-          className="flex items-center gap-1.5 rounded-[9px] border-[1.5px] border-brand bg-brand-light px-3.5 py-[7px] text-xs font-bold text-brand transition-all hover:bg-brand hover:text-white"
-        >
-          <SparkleIcon /> Generate
-        </button>
-
-        <button
-          onClick={() => setShowBatch(true)}
-          className="flex items-center gap-1.5 rounded-[9px] border-[1.5px] border-batch-border bg-batch-light px-3.5 py-[7px] text-xs font-bold text-batch transition-all hover:border-batch hover:bg-batch hover:text-white"
-        >
-          <BoltIcon /> Batch
-        </button>
+        ))}
       </div>
-
-      <div className="flex items-center gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-          Export as
-        </span>
-        <div className="flex gap-0.5 rounded-lg border-[1.5px] border-border bg-secondary p-[3px]">
-          {(['png', 'pdf', 'both'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setExportFormat(f)}
-              className={cn(
-                'rounded-md px-2.5 py-[3px] text-[10px] font-bold uppercase tracking-[0.05em] transition-all',
-                exportFormat === f ? 'bg-card text-foreground shadow-soft' : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {f === 'both' ? 'PNG+PDF' : f.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <div className="flex-1" />
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          title="Export (⌘E)"
-          className="whitespace-nowrap rounded-[9px] bg-brand px-[18px] py-[7px] text-xs font-bold text-white shadow-[0_2px_8px_var(--blue-dim)] transition-colors hover:bg-brand-hover disabled:bg-muted-foreground disabled:shadow-none"
-        >
-          {exporting ? '…' : 'Export All'}
-        </button>
-      </div>
+      <div className="flex-1" />
+      <span className="text-[11px] text-muted-foreground">
+        Slide {previewIndex + 1} of {config.slides.length}
+      </span>
     </div>
   )
 
@@ -461,7 +397,51 @@ export default function App() {
         </div>
       )}
 
+      {!isMobile && (
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setShowSaved(true)}
+            className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-brand hover:text-brand">
+            <FolderIcon /> Library
+          </button>
+          <button onClick={() => setShowExports(true)}
+            className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-brand hover:text-brand">
+            <FolderIcon /> Exports
+          </button>
+          <div className="flex items-center gap-0.5 rounded-lg border-[1.5px] border-border bg-secondary p-0.5">
+            <button onClick={undo} disabled={!canUndo} title="Undo (⌘Z)"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors enabled:hover:bg-card enabled:hover:text-brand disabled:opacity-30">
+              <UndoIcon />
+            </button>
+            <button onClick={redo} disabled={!canRedo} title="Redo (⇧⌘Z)"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors enabled:hover:bg-card enabled:hover:text-brand disabled:opacity-30">
+              <RedoIcon />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1" />
+
+      {!isMobile && (
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowCaptions(true)}
+            className="rounded-[9px] border-[1.5px] border-coral/40 bg-coral-light px-3 py-[7px] text-xs font-bold text-coral-dark transition-all hover:bg-coral hover:text-white">
+            Captions
+          </button>
+          <button onClick={() => setShowGenerate(true)}
+            className="flex items-center gap-1.5 rounded-[9px] border-[1.5px] border-brand bg-brand-light px-3 py-[7px] text-xs font-bold text-brand transition-all hover:bg-brand hover:text-white">
+            <SparkleIcon /> Generate
+          </button>
+          <button onClick={() => setShowBatch(true)}
+            className="flex items-center gap-1.5 rounded-[9px] border-[1.5px] border-batch-border bg-batch-light px-3 py-[7px] text-xs font-bold text-batch transition-all hover:border-batch hover:bg-batch hover:text-white">
+            <BoltIcon /> Batch
+          </button>
+          <button onClick={handleExport} disabled={exporting} title="Export (⌘E)"
+            className="whitespace-nowrap rounded-[9px] bg-brand px-4 py-[7px] text-xs font-bold text-white shadow-[0_2px_8px_var(--blue-dim)] transition-colors hover:bg-brand-hover disabled:bg-muted-foreground disabled:shadow-none">
+            {exporting ? '…' : 'Export All'}
+          </button>
+        </div>
+      )}
 
       {isMobile && (
         <>
@@ -558,15 +538,7 @@ export default function App() {
                 slides={config.slides} activeIndex={activeIndex} onSelect={handleSelect}
                 onAdd={addSlide} onRemove={removeSlide} onReorder={reorder} onDuplicate={duplicateSlide}
               />
-              {activeSlide && <SlideEditor slide={activeSlide} allSlides={config.slides} onChange={updateSlide} />}
-              {activeSlide && (
-                <BgImageCard
-                  slide={activeSlide} allSlides={config.slides}
-                  onBgImage={applyBgImage} onBgImageEach={applyBgImageEach} onSlideChange={updateSlide}
-                  startJob={startJob} runningJobs={running}
-                />
-              )}
-              <div className="flex min-w-[300px] flex-[1_1_340px] flex-col overflow-hidden bg-background">
+              <div className="flex min-w-[320px] flex-1 flex-col overflow-hidden bg-background">
                 {controlsPanel}
                 <div className="flex-1 overflow-hidden">
                   <InstagramPreview
@@ -575,6 +547,13 @@ export default function App() {
                   />
                 </div>
               </div>
+              {activeSlide && (
+                <Inspector
+                  slide={activeSlide} allSlides={config.slides} onChange={updateSlide}
+                  onBgImage={applyBgImage} onBgImageEach={applyBgImageEach} onSlideChange={updateSlide}
+                  startJob={startJob} runningJobs={running}
+                />
+              )}
             </>
           )}
         </div>
@@ -649,7 +628,7 @@ export default function App() {
             {mobileTab === 'edit' && activeSlide && (
               <div className="flex h-full overflow-hidden">
                 <div className="min-w-0 flex-1 overflow-y-auto border-r border-border">
-                  <SlideEditor slide={activeSlide} allSlides={config.slides} onChange={updateSlide} />
+                  <SlideEditor slide={activeSlide} allSlides={config.slides} onChange={updateSlide} section="content" />
                 </div>
                 <div className="flex w-[210px] shrink-0 flex-col items-center gap-2.5 overflow-y-auto bg-background px-2.5 py-4">
                   <div className="text-[10px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
@@ -670,8 +649,8 @@ export default function App() {
 
             {mobileTab === 'bg' && activeSlide && (
               <div className="flex h-full flex-col overflow-hidden">
-                <BgImageCard
-                  slide={activeSlide} allSlides={config.slides}
+                <Inspector
+                  slide={activeSlide} allSlides={config.slides} onChange={updateSlide}
                   onBgImage={applyBgImage} onBgImageEach={applyBgImageEach} onSlideChange={updateSlide}
                   startJob={startJob} runningJobs={running}
                 />

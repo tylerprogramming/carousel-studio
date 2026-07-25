@@ -1,4 +1,5 @@
 import { Slide } from '../types'
+import { useSettings } from '../hooks/useSettings'
 
 interface SlidePreviewProps {
   slide: Slide
@@ -23,6 +24,7 @@ function blend(fg: string, bg: string, f: number) {
  * paragraph. Mirrored in generate_slide.py — change both together.
  */
 function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps>) {
+  const { handle, username } = useSettings()
   const ts = slide.textScale ?? 1
   const s = (px: number) => Math.round(px * scale)
   const sf = (px: number) => Math.round(px * scale * ts)
@@ -44,7 +46,7 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
       {/* top rail */}
       <div style={{ position: 'absolute', top: s(74), left: PAD, right: PAD, display: 'flex', justifyContent: 'space-between' }}>
         <span style={{ fontFamily: MONO, fontSize: s(26), color: DIM, letterSpacing: '0.08em' }}>
-          {(slide.emphasisLine && slide.type === 'cover') ? 'codewithtyler' : 'codewithtyler'}
+          {username}
         </span>
         <span style={{ fontFamily: MONO, fontSize: s(26), color: DIM, letterSpacing: '0.08em' }}>
           {slide.type === 'cover' ? 'v1.0' : `${String(slide.slideNumber).padStart(2, '0')} / ${String(totalSlides).padStart(2, '0')}`}
@@ -69,9 +71,13 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
         {slide.emphasisLine && (
           slide.type === 'cover' ? (
             <span style={{
-              display: 'inline-block', background: AC, color: BG,
-              fontSize: sf(44), fontWeight: 700, padding: `${s(12)}px ${s(20)}px`, borderRadius: s(8),
-            }}>{slide.emphasisLine}</span>
+              // `inline` + cloned decoration so a long line wraps into stacked
+              // pills rather than overflowing the slide edge
+              display: 'inline', background: AC, color: BG,
+              fontSize: sf(44), fontWeight: 700, lineHeight: 1.75,
+              padding: `${s(10)}px ${s(18)}px`, borderRadius: s(8),
+              boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone',
+            } as React.CSSProperties}>{slide.emphasisLine}</span>
           ) : (
             <div style={{ fontSize: sf(44), fontWeight: 600, color: AC }}>{slide.emphasisLine}</div>
           )
@@ -122,7 +128,7 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
 
       {/* footer */}
       <div style={{ position: 'absolute', bottom: s(64), left: PAD, right: PAD, display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ fontFamily: MONO, fontSize: s(26), color: DIM }}>{slide.footerColor ? '' : ''}@tylerreedai</span>
+        <span style={{ fontFamily: MONO, fontSize: s(26), color: DIM }}>{handle}</span>
         {slide.slideNumber < totalSlides && (
           <span style={{ fontFamily: MONO, fontSize: s(26), color: AC }}>swipe →</span>
         )}

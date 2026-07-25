@@ -254,8 +254,14 @@ def generate_terminal_slide(data):
 
     d.rectangle([0, 0, WIDTH, 8], fill=ac)
 
+    # Rail shows the bare username, footer shows it with the @ — both come from
+    # settings.json via the server, so nothing personal is baked into the app.
+    handle = str(data.get('handle') or '@yourhandle').strip()
+    if not handle.startswith('@'):
+        handle = '@' + handle
+
     rail = load_mono(26)
-    d.text((PADX, 74), 'codewithtyler', font=rail, fill=dim)
+    d.text((PADX, 74), handle[1:], font=rail, fill=dim)
     right = 'v1.0' if stype == 'cover' else f'{slide_num:02d} / {total:02d}'
     d.text((WIDTH - PADX, 74), right, font=rail, fill=dim, anchor='rt')
 
@@ -280,10 +286,14 @@ def generate_terminal_slide(data):
     emphasis = (data.get('emphasisLine') or '').strip()
     if emphasis:
         if stype == 'cover':
+            # One pill per wrapped line, mirroring box-decoration-break: clone
             f_e = load_font(fs(44), 700)
-            tw = d.textbbox((0, 0), emphasis, font=f_e)[2]
-            d.rounded_rectangle([PADX, y, PADX + tw + 40, y + fs(44) + 24], radius=8, fill=ac)
-            d.text((PADX + 20, y + 12), emphasis, font=f_e, fill=bg)
+            avail = WIDTH - PADX * 2 - 40
+            for line in wrap_text(d, emphasis, f_e, avail):
+                tw = d.textbbox((0, 0), line, font=f_e)[2]
+                d.rounded_rectangle([PADX, y, PADX + tw + 36, y + fs(44) + 20], radius=8, fill=ac)
+                d.text((PADX + 18, y + 10), line, font=f_e, fill=bg)
+                y += fs(44) + 30
         else:
             f_e = load_font(fs(44), 600)
             d.text((PADX, y), emphasis, font=f_e, fill=ac)
@@ -315,7 +325,7 @@ def generate_terminal_slide(data):
             by += round(fs(32) * 1.65)
 
     foot = load_mono(26)
-    d.text((PADX, HEIGHT - 64), '@tylerreedai', font=foot, fill=dim)
+    d.text((PADX, HEIGHT - 64), handle, font=foot, fill=dim)
     if slide_num < total:
         d.text((WIDTH - PADX, HEIGHT - 64), 'swipe →', font=foot, fill=ac, anchor='rt')
 

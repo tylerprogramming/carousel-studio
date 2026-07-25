@@ -32,7 +32,7 @@ export interface Job {
 
 const POLL_MS = 1500
 
-export function useJobs(carouselId: string, onComplete: (job: Job) => void) {
+export function useJobs(carouselId: string, carouselTitle: string, onComplete: (job: Job) => void) {
   const [jobs, setJobs] = useState<Job[]>([])
   const handled = useRef<Set<string>>(new Set())
   // Keep the latest callback without making the polling effect depend on it
@@ -67,13 +67,13 @@ export function useJobs(carouselId: string, onComplete: (job: Job) => void) {
   const start = useCallback(async (body: Record<string, unknown>) => {
     const res = await fetch('/api/jobs/generate-bg', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...body, carouselId }),
+      body: JSON.stringify({ ...body, carouselId, carouselTitle }),
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || 'Could not start generation')
     await refresh()
     return data.jobId as string
-  }, [carouselId, refresh])
+  }, [carouselId, carouselTitle, refresh])
 
   const cancel = useCallback(async (id: string) => {
     await fetch(`/api/jobs/${id}`, { method: 'DELETE' }).catch(() => {})

@@ -11,6 +11,8 @@ interface Props {
   slide: Slide
   allSlides: Slide[]
   onChange: (updated: Slide) => void
+  /** Which group of controls to render. The Inspector shows one tab at a time. */
+  section?: 'content' | 'style' | 'image'
   onBgImage?: (url: string, scope: 'single' | 'all', slideNumber?: number) => void
   onBgImageEach?: (updates: { slideNumber: number; url: string }[]) => void
 }
@@ -41,6 +43,48 @@ function ColorSwatch({ color, active, onClick }: { color: { name: string; value:
   )
 }
 
+/** One label + swatch strip + custom picker. Replaces five copies of the same markup. */
+function ColorRow({ label, swatches, value, onPick, onReset }: {
+  label: string
+  swatches: { name: string; value: string }[]
+  value: string
+  onPick: (e: React.MouseEvent, v: string) => void
+  onReset?: () => void
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-[74px] shrink-0 text-[11px] font-semibold text-muted-foreground">{label}</span>
+      <div className="flex flex-1 flex-wrap items-center gap-1.5">
+        {swatches.map((c, i) => (
+          <button
+            key={`${c.value}-${i}`}
+            title={`${c.name} — shift-click for every slide`}
+            onClick={(e) => onPick(e, c.value)}
+            className={cn(
+              'h-6 w-6 rounded-md border transition-all',
+              c.value.toLowerCase() === (value || '').toLowerCase()
+                ? 'border-brand ring-2 ring-brand/30'
+                : 'border-border hover:scale-105',
+            )}
+            style={{ background: c.value }}
+          />
+        ))}
+        <input
+          type="color" value={value || '#888888'}
+          onChange={(e) => onPick({ shiftKey: false } as any, e.target.value)}
+          title="Custom"
+          className="h-6 w-6 cursor-pointer rounded-md border border-border p-0.5"
+        />
+        {onReset && (
+          <button onClick={onReset} className="text-[10px] text-muted-foreground underline hover:text-foreground">
+            reset
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Editor ───────────────────────────────────────────────────────────────
 
 const SLIDE_TYPES: { value: SlideType; label: string }[] = [
@@ -49,7 +93,7 @@ const SLIDE_TYPES: { value: SlideType; label: string }[] = [
   { value: 'cta', label: 'CTA' },
 ]
 
-export default function SlideEditor({ slide, onChange }: Props) {
+export default function SlideEditor({ slide, onChange, section = 'content' }: Props) {
   function set<K extends keyof Slide>(key: K, val: Slide[K]) {
     onChange({ ...slide, [key]: val })
   }
@@ -70,12 +114,10 @@ export default function SlideEditor({ slide, onChange }: Props) {
   }
 
   return (
-    <div
-      className="flex overflow-hidden bg-card border-r border-border shrink-0"
-      style={{ width: 340, minWidth: 300, maxWidth: 380 }}
-    >
+    <div className="flex h-full overflow-hidden bg-card">
       <div className="flex-1 overflow-y-auto p-4 min-w-0 scrollbar-thin">
 
+        {section === 'content' && (<>
         {/* Slide type */}
         <FieldSection title="Slide Type">
           <div className="flex gap-1.5">
@@ -188,6 +230,9 @@ export default function SlideEditor({ slide, onChange }: Props) {
           </div>
         </FieldSection>
 
+        </>)}
+
+        {section === 'style' && (<>
         <Separator className="my-4" />
 
         <FieldSection title="Theme">
@@ -207,104 +252,57 @@ export default function SlideEditor({ slide, onChange }: Props) {
           />
         </FieldSection>
 
-        <FieldSection title="Background Colour">
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {BG_COLORS.map((c) => (
-              <ColorSwatch
-                key={c.value}
-                color={c}
-                active={c.value.toLowerCase() === slide.bgColor.toLowerCase()}
-                onClick={(e) => setMaybeAll(e, 'bgColor', c.value)}
-              />
-            ))}
-            <input type="color" value={slide.bgColor} onChange={(e) => set('bgColor', e.target.value)}
-              title="Custom" className="w-7 h-7 rounded-md cursor-pointer border border-border p-0.5" />
+        {/* One compact block instead of five identical stacked rows. Theme sets
+            the first three in a click; these are the overrides. */}
+        <details className="mb-4 rounded-lg border border-border bg-secondary/40 p-3" open={false}>
+          <summary className="cursor-pointer select-none text-[11px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
+            Fine-tune colours
+          </summary>
+
+          <div className="mt-3 space-y-3">
+            <ColorRow label="Background" swatches={BG_COLORS} value={slide.bgColor}
+              onPick={(e, v) => setMaybeAll(e, 'bgColor', v)} />
+            <ColorRow label="Text" swatches={TEXT_COLORS} value={slide.textColor}
+              onPick={(e, v) => setMaybeAll(e, 'textColor', v)} />
+            <ColorRow label="Accent" swatches={ACCENT_COLORS} value={slide.accentColor}
+              onPick={(e, v) => setMaybeAll(e, 'accentColor', v)} />
+            <ColorRow label="Footer"
+              swatches={[{ name: 'White', value: '#FFFFFF' }, { name: 'Dark', value: '#1B1B1B' },
+                         { name: 'Cream', value: '#F5F0EB' }, { name: 'Accent', value: slide.accentColor }]}
+              value={slide.footerColor ?? '#FFFFFF'}
+              onPick={(e, v) => setMaybeAll(e, 'footerColor', v)} />
+            <ColorRow label="Body text"
+              swatches={[{ name: 'Dark', value: '#1B1B1B' }, { name: 'Grey', value: '#888888' },
+                         { name: 'Cream', value: '#F5F0EB' }, { name: 'White', value: '#FFFFFF' }]}
+              value={slide.bodyTextColor ?? ''}
+              onPick={(e, v) => setMaybeAll(e, 'bodyTextColor', v)}
+              onReset={() => set('bodyTextColor', undefined)} />
           </div>
+        </details>
+
+        <FieldSection title="Apply to All Slides">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm"
+              onClick={() => onChange({ ...slide, _applyKeysToAll: ['bgColor', 'textColor', 'accentColor', 'variant'] } as any)}>
+              All colours
+            </Button>
+            <Button variant="outline" size="sm"
+              onClick={() => onChange({ ...slide, _applyKeysToAll: ['textScale'] } as any)}>
+              Text size
+            </Button>
+            <Button variant="outline" size="sm"
+              onClick={() => onChange({ ...slide, _applyKeysToAll: ['footerColor', 'bodyTextColor'] } as any)}>
+              Footer + body
+            </Button>
+          </div>
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Or shift-click any swatch, text size, or slide type above to push just that one to every slide.
+          </p>
         </FieldSection>
 
+        </>)}
 
-        <FieldSection title="Text Colour">
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {TEXT_COLORS.map((c) => {
-              const active = c.value.toLowerCase() === slide.textColor.toLowerCase()
-              return (
-                <button
-                  key={c.value}
-                  onClick={(e) => setMaybeAll(e, 'textColor', c.value)}
-                  className={cn(
-                    'px-3 py-1.5 rounded-md text-xs font-semibold border transition-all duration-150 cursor-pointer',
-                    active
-                      ? 'border-primary bg-primary/10 text-primary'
-                      : 'border-border bg-secondary hover:border-primary/40'
-                  )}
-                  style={{ color: active ? undefined : c.value === '#FFFFFF' ? '#18181b' : c.value }}
-                >
-                  {c.name}
-                </button>
-              )
-            })}
-            <input type="color" value={slide.textColor} onChange={(e) => set('textColor', e.target.value)}
-              title="Custom" className="w-7 h-7 rounded-md cursor-pointer border border-border p-0.5" />
-          </div>
-        </FieldSection>
-
-        <FieldSection title="Accent Colour">
-          <div className="flex flex-wrap gap-1.5 items-center">
-            {ACCENT_COLORS.map((c) => (
-              <ColorSwatch
-                key={c.value}
-                color={c}
-                active={c.value.toLowerCase() === slide.accentColor.toLowerCase()}
-                onClick={(e) => setMaybeAll(e, 'accentColor', c.value)}
-              />
-            ))}
-            <input type="color" value={slide.accentColor} onChange={(e) => set('accentColor', e.target.value)}
-              title="Custom" className="w-7 h-7 rounded-md cursor-pointer border border-border p-0.5" />
-          </div>
-        </FieldSection>
-
-        <FieldSection title="Footer Color">
-          <div className="flex items-center gap-2">
-            {['#FFFFFF', '#1B1B1B', '#F5F0EB', slide.accentColor].map((c) => (
-              <button
-                key={c}
-                onClick={(e) => setMaybeAll(e, 'footerColor', c)}
-                style={{ background: c, width: 28, height: 28, borderRadius: 6, border: (slide.footerColor ?? '#FFFFFF').toLowerCase() === c.toLowerCase() ? '2.5px solid #5B6CF2' : '2px solid transparent', cursor: 'pointer', outline: '1px solid rgba(0,0,0,0.08)' }}
-                title={c}
-              />
-            ))}
-            <input type="color" value={slide.footerColor ?? '#FFFFFF'} onChange={(e) => set('footerColor', e.target.value)}
-              title="Custom" className="w-7 h-7 rounded-md cursor-pointer border border-border p-0.5" />
-            <span className="text-xs text-muted-foreground ml-1">Footer text</span>
-          </div>
-        </FieldSection>
-
-        <FieldSection title="Body Text Colour">
-          <div className="flex items-center gap-2">
-            {['#1B1B1B', '#888888', '#F5F0EB', '#FFFFFF'].map((c) => (
-              <button
-                key={c}
-                onClick={(e) => setMaybeAll(e, 'bodyTextColor', c)}
-                style={{ background: c, width: 28, height: 28, borderRadius: 6, border: (slide.bodyTextColor ?? '').toLowerCase() === c.toLowerCase() ? '2.5px solid #5B6CF2' : '2px solid transparent', cursor: 'pointer', outline: '1px solid rgba(0,0,0,0.08)' }}
-                title={c}
-              />
-            ))}
-            <input
-              type="color"
-              value={slide.bodyTextColor ?? '#888888'}
-              onChange={(e) => set('bodyTextColor', e.target.value)}
-              title="Custom"
-              className="w-7 h-7 rounded-md cursor-pointer border border-border p-0.5"
-            />
-            <button
-              onClick={() => set('bodyTextColor', undefined)}
-              className="text-xs text-muted-foreground underline cursor-pointer hover:text-foreground ml-1"
-            >
-              Reset
-            </button>
-          </div>
-        </FieldSection>
-
+        {section === 'image' && (<>
         {/* ── Unified Image section ──────────────────────────── */}
         {(() => {
           const hasBg = !!(slide.backgroundImage || slide.backgroundVideo)
@@ -550,26 +548,7 @@ export default function SlideEditor({ slide, onChange }: Props) {
 
         <Separator className="my-4" />
 
-        <FieldSection title="Apply to All Slides">
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm"
-              onClick={() => onChange({ ...slide, _applyKeysToAll: ['bgColor', 'textColor', 'accentColor', 'variant'] } as any)}>
-              All colours
-            </Button>
-            <Button variant="outline" size="sm"
-              onClick={() => onChange({ ...slide, _applyKeysToAll: ['textScale'] } as any)}>
-              Text size
-            </Button>
-            <Button variant="outline" size="sm"
-              onClick={() => onChange({ ...slide, _applyKeysToAll: ['footerColor', 'bodyTextColor'] } as any)}>
-              Footer + body
-            </Button>
-          </div>
-          <p className="mt-2 text-[10px] text-muted-foreground">
-            Or shift-click any swatch, text size, or slide type above to push just that one to every slide.
-          </p>
-        </FieldSection>
-
+        </>)}
       </div>
     </div>
   )
