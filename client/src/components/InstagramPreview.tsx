@@ -15,6 +15,11 @@ const SLIDE_SCALE = PHONE_W / 1080
 const SLIDE_H     = Math.round(PHONE_W * 1350 / 1080)
 // TikTok: 9:16 aspect ratio phone screen height (matches Instagram phone's overall chrome height)
 const TT_VIDEO_H  = Math.round(PHONE_W * 16 / 9)
+// Mirrors tiktok_safe.py: the 4:5 slide is inset inside the 9:16 frame rather
+// than cropped to fill it, so the preview matches the exported TikTok set.
+// Change these together with the defaults in that script.
+const TT_MARGIN   = 110 / 1080          // side margin as a fraction of width
+const TT_TOP_BIAS = 0.38                // <0.5 pushes content up, off the caption
 
 // ── Shared phone shell ────────────────────────────────────────────────────────
 function PhoneShell({ children, bg = '#fff' }: { children: React.ReactNode; bg?: string }) {
@@ -250,14 +255,30 @@ function TikTokPhone({ slides, activeIndex, onIndexChange }: Omit<Props, 'platfo
     <PhoneShell bg="#000">
       {/* Full-screen video area: CSS scale fills 9:16 height, overflow clips sides */}
       <div style={{ position: 'relative', width: PHONE_W, height: TT_VIDEO_H, background: '#000', overflow: 'hidden' }}>
-        {/* Scale the normal carousel strip up to fill the full height */}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0,
-          transformOrigin: 'top center',
-          transform: `scale(${TT_VIDEO_H / SLIDE_H})`,
-        }}>
-          <CarouselStrip slides={slides} activeIndex={activeIndex} onMouseDown={onMouseDown} onMouseUp={onMouseUp} />
-        </div>
+        {/* Inset the slide the way tiktok_safe.py does, on the slide's own
+            background colour, so nothing sits under TikTok's overlays. The old
+            behaviour scaled the 4:5 slide to fill 9:16, which cropped the sides
+            and showed a frame TikTok would never render. */}
+        {(() => {
+          const contentW = Math.round(PHONE_W * (1 - TT_MARGIN * 2))
+          const contentH = Math.round(contentW * 1350 / 1080)
+          const top      = Math.round((TT_VIDEO_H - contentH) * TT_TOP_BIAS)
+          const pad      = slides[activeIndex]?.bgColor || '#12141A'
+          return (
+            <div style={{ position: 'absolute', inset: 0, background: pad }}>
+              <div style={{ position: 'absolute', top, left: Math.round(PHONE_W * TT_MARGIN) }}>
+                <CarouselStrip
+                  slides={slides}
+                  activeIndex={activeIndex}
+                  onMouseDown={onMouseDown}
+                  onMouseUp={onMouseUp}
+                  width={contentW}
+                  height={contentH}
+                />
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Status bar overlay — transparent over slide */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 18px 6px', fontFamily: 'system-ui', fontWeight: 600, fontSize: 12, color: '#fff' }}>
