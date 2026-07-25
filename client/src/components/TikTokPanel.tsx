@@ -1,10 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Slide } from '../types'
 import SlidePreview from './SlidePreview'
-import FlashBatchModal from './FlashBatchModal'
-import FlashLibraryModal from './FlashLibraryModal'
 
-import { BLUE, BORDER, BG, MUTED, TEXT as TEXT_C, TIKTOK, TIKTOK_D, WHITE } from '../lib/tokens'
+import { BLUE, BORDER, BG, MUTED, TEXT as TEXT_C, TIKTOK, TIKTOK_D, TIKTOK_SAFE, WHITE } from '../lib/tokens'
 import { useSettings } from '../hooks/useSettings'
 
 type FlashStyle = 'statement' | 'video' | 'terminal'
@@ -57,7 +55,6 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
     videos: { filename: string; url: string }[]
     tiktokSlides: string[]
   }>({ videos: [], tiktokSlides: [] })
-  const [playing, setPlaying] = useState<string | null>(null)
 
   const slug = exportSlug(carouselTitle)
   const loadExported = useCallback(async () => {
@@ -84,8 +81,6 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
   const [generating, setGenerating] = useState(false)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [error, setError]       = useState<string | null>(null)
-  const [showBatch, setShowBatch] = useState(false)
-  const [showLibrary, setShowLibrary] = useState(false)
   const prevIndexRef            = useRef(activeIndex)
 
   // Reset TT text when slide changes
@@ -142,32 +137,32 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
   // Phone: fill available space, 9:16 ratio
   const PHONE_W = 360
   const PHONE_H = Math.round(PHONE_W * 16 / 9)
-  const SLIDE_W = PHONE_W
-  const SLIDE_H = Math.round(SLIDE_W * 1350 / 1080)
-  const SCALE   = SLIDE_W / 1080
-  const slideTop = Math.round((PHONE_H - SLIDE_H) / 2)
+  // Inset to the TikTok safe area, matching tiktok_safe.py, so this shows the
+  // exported framing rather than a full-bleed slide TikTok would cover with
+  // its own UI. This is the preview that renders when TikTok is selected.
+  const SLIDE_W   = Math.round(PHONE_W * (1 - TIKTOK_SAFE.margin * 2))
+  const SLIDE_H   = Math.round(SLIDE_W * 1350 / 1080)
+  const SCALE     = SLIDE_W / 1080
+  const slideTop  = Math.round((PHONE_H - SLIDE_H) * TIKTOK_SAFE.topBias)
+  const slideLeft = Math.round(PHONE_W * TIKTOK_SAFE.margin)
 
   const exportedBlock = (exported.videos.length > 0 || exported.tiktokSlides.length > 0) && (
     <div style={{ marginBottom: 16 }}>
       <div style={labelStyle}>Exported for TikTok</div>
 
-      {playing && (
-        <video src={playing} controls autoPlay loop playsInline
-               style={{ width: '100%', maxHeight: 380, background: '#000', borderRadius: 10, marginBottom: 8 }} />
-      )}
-
       {exported.videos.map((v) => (
-        <button key={v.url} onClick={() => setPlaying(v.url)}
-                title={v.filename}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'left', marginBottom: 6,
-                  padding: '7px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 700,
-                  border: `1px solid ${playing === v.url ? TIKTOK : BORDER}`,
-                  color: playing === v.url ? TIKTOK : MUTED, background: WHITE, cursor: 'pointer',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>
-          ▶ {v.filename}
-        </button>
+        <div key={v.url} style={{ marginBottom: 10 }}>
+          <video src={v.url} controls loop playsInline
+                 style={{ width: '100%', background: '#000', borderRadius: 10, display: 'block' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+            <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {v.filename}
+            </span>
+            <a href={v.url} download style={{ fontSize: 10, color: TIKTOK, fontWeight: 700, textDecoration: 'none' }}>
+              download
+            </a>
+          </div>
+        </div>
       ))}
 
       {exported.tiktokSlides.length > 0 && (
@@ -193,8 +188,6 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', background: BG }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {showBatch && <FlashBatchModal onClose={() => setShowBatch(false)} />}
-      {showLibrary && <FlashLibraryModal onClose={() => setShowLibrary(false)} />}
 
       {/* ── Left: controls ── */}
       <div style={{
@@ -213,36 +206,8 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
             <TikTokIcon size={15} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: TEXT_C }}>Flash Video</div>
-            <div style={{ fontSize: 10, color: MUTED }}>Slide {slide?.slideNumber} · separate from carousel</div>
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            <button
-              onClick={() => setShowLibrary(true)}
-              style={{
-                padding: '6px 10px', borderRadius: 8, border: `1.5px solid ${BORDER}`,
-                background: BG, color: TEXT_C, fontSize: 10, fontWeight: 700,
-                cursor: 'pointer', whiteSpace: 'nowrap',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = TEXT_C }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = BORDER }}
-            >
-              Library
-            </button>
-            <button
-              onClick={() => setShowBatch(true)}
-              style={{
-                padding: '6px 10px', borderRadius: 8, border: `1.5px solid ${TIKTOK}`,
-                background: '#fff0f3', color: TIKTOK, fontSize: 10, fontWeight: 800,
-                cursor: 'pointer', whiteSpace: 'nowrap',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = TIKTOK; e.currentTarget.style.color = WHITE }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#fff0f3'; e.currentTarget.style.color = TIKTOK }}
-            >
-              Generate All
-            </button>
+            <div style={{ fontSize: 13, fontWeight: 800, color: TEXT_C }}>TikTok</div>
+            <div style={{ fontSize: 10, color: MUTED }}>Exported sets, and a single-slide clip</div>
           </div>
         </div>
 
@@ -386,7 +351,7 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
             background: slide?.bgColor ?? '#111', position: 'relative', flexShrink: 0,
           }}>
             {/* Live slide preview (uses TT text, not carousel text) */}
-            <div style={{ position: 'absolute', left: 0, top: slideTop, width: SLIDE_W, height: SLIDE_H, overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', left: slideLeft, top: slideTop, width: SLIDE_W, height: SLIDE_H, overflow: 'hidden' }}>
               {previewSlide && <SlidePreview slide={previewSlide} scale={SCALE} totalSlides={slides.length} />}
             </div>
 

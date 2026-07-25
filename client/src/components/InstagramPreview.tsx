@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Slide } from '../types'
 import SlidePreview from './SlidePreview'
 import { useSettings } from '../hooks/useSettings'
+import { TIKTOK_SAFE } from '../lib/tokens'
 
 interface Props {
   slides: Slide[]
@@ -15,11 +16,8 @@ const SLIDE_SCALE = PHONE_W / 1080
 const SLIDE_H     = Math.round(PHONE_W * 1350 / 1080)
 // TikTok: 9:16 aspect ratio phone screen height (matches Instagram phone's overall chrome height)
 const TT_VIDEO_H  = Math.round(PHONE_W * 16 / 9)
-// Mirrors tiktok_safe.py: the 4:5 slide is inset inside the 9:16 frame rather
-// than cropped to fill it, so the preview matches the exported TikTok set.
-// Change these together with the defaults in that script.
-const TT_MARGIN   = 110 / 1080          // side margin as a fraction of width
-const TT_TOP_BIAS = 0.38                // <0.5 pushes content up, off the caption
+const TT_MARGIN   = TIKTOK_SAFE.margin
+const TT_TOP_BIAS = TIKTOK_SAFE.topBias
 
 // ── Shared phone shell ────────────────────────────────────────────────────────
 function PhoneShell({ children, bg = '#fff' }: { children: React.ReactNode; bg?: string }) {

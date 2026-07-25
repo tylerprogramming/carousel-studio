@@ -53,3 +53,17 @@ export const CANVAS = {
 
 /** Instagram's 4:5 feed ratio, used to size thumbnails and phone mockups. */
 export const ASPECT = CANVAS.height / CANVAS.width
+
+/**
+ * TikTok safe area. The 4:5 slide is inset inside the 9:16 frame rather than
+ * cropped to fill it, clear of the caption block, action rail and tab chrome.
+ *
+ * These mirror the defaults in tiktok_safe.py. Change them together or the
+ * preview stops matching the exported set.
+ */
+export const TIKTOK_SAFE = {
+  /** Side margin as a fraction of frame width (110 / 1080) */
+  margin: 110 / 1080,
+  /** <0.5 pushes content up, away from the caption */
+  topBias: 0.38,
+} as const
