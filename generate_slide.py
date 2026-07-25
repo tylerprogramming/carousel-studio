@@ -250,6 +250,32 @@ def generate_terminal_slide(data):
 
     PADX = 84
     img = Image.new('RGB', (WIDTH, HEIGHT), bg)
+
+    # Optional photo behind the terminal chrome. Cover-cropped like the CSS
+    # `object-fit: cover` the preview uses, so framing matches the export.
+    bg_path = data.get('backgroundImagePath')
+    has_photo = bool(bg_path and os.path.exists(bg_path))
+    if has_photo:
+        try:
+            src = Image.open(bg_path).convert('RGB')
+            img.paste(cover_crop(src, WIDTH, HEIGHT,
+                                 50 + float(data.get('bgPanX', 0) or 0) / 2,
+                                 50 + float(data.get('bgPanY', 0) or 0) / 2), (0, 0))
+        except Exception:
+            pass
+
+    # Bottom fade: a vertical ramp to the slide's own background colour, so the
+    # photo dissolves into the slide instead of stopping at a hard edge. Value
+    # is the fraction of slide height the ramp covers.
+    fade = float(data.get('bottomFade', 0) or 0)
+    if fade > 0:
+        fade_h = max(1, min(HEIGHT, round(HEIGHT * fade)))
+        ramp = Image.new('L', (1, fade_h))
+        # Squared falloff — a linear ramp reads as a visible band, this does not
+        ramp.putdata([int(255 * (i / max(1, fade_h - 1)) ** 2) for i in range(fade_h)])
+        img.paste(Image.new('RGB', (WIDTH, fade_h), bg), (0, HEIGHT - fade_h),
+                  ramp.resize((WIDTH, fade_h)))
+
     d = ImageDraw.Draw(img)
 
     d.rectangle([0, 0, WIDTH, 8], fill=ac)
@@ -319,7 +345,10 @@ def generate_terminal_slide(data):
             ly += line_h
     elif (data.get('bodyText') or '').strip():
         f_b = load_mono(fs(32))
-        by = 720
+        # With a photo behind, 720 lands the copy on the brightest part of the
+        # frame. Drop it into the faded zone above the footer instead.
+        n_lines = len(wrap_text(d, data['bodyText'].strip(), f_b, WIDTH - PADX * 2))
+        by = (HEIGHT - 150 - n_lines * round(fs(32) * 1.65)) if has_photo else 720
         for ln in wrap_text(d, data['bodyText'].strip(), f_b, WIDTH - PADX * 2):
             d.text((PADX, by), ln, font=f_b, fill=dim)
             by += round(fs(32) * 1.65)

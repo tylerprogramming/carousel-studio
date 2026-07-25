@@ -11,6 +11,10 @@ function hexToRgb(hex: string) {
   const h = hex.replace('#', '')
   return { r: parseInt(h.slice(0,2),16), g: parseInt(h.slice(2,4),16), b: parseInt(h.slice(4,6),16) }
 }
+function hexToRgba(hex: string, a: number) {
+  const { r, g, b } = hexToRgb(hex)
+  return `rgba(${r},${g},${b},${a})`
+}
 function luminance({ r, g, b }: { r:number;g:number;b:number }) { return 0.299*r + 0.587*g + 0.114*b }
 function blend(fg: string, bg: string, f: number) {
   const a = hexToRgb(fg), b2 = hexToRgb(bg)
@@ -43,6 +47,29 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
       width: W, height: H, position: 'relative', overflow: 'hidden', flexShrink: 0,
       background: BG, fontFamily: "'Inter', system-ui, sans-serif",
     }}>
+      {/* Optional photo behind the chrome. Mirrored in generate_slide.py. */}
+      {slide.backgroundImage && (
+        <img
+          src={slide.backgroundImage}
+          alt=""
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover',
+            objectPosition: `${50 + (slide.bgPanX ?? 0) / 2}% ${50 + (slide.bgPanY ?? 0) / 2}%`,
+          }}
+        />
+      )}
+
+      {/* Bottom fade to the slide's own background colour. The squared stops
+          match the falloff Pillow draws, so preview and export agree. */}
+      {(slide.bottomFade ?? 0) > 0 && (
+        <div style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          height: `${(slide.bottomFade ?? 0) * 100}%`,
+          background: `linear-gradient(to bottom, ${hexToRgba(BG, 0)} 0%, ${hexToRgba(BG, 0.25)} 50%, ${hexToRgba(BG, 0.56)} 75%, ${BG} 100%)`,
+        }} />
+      )}
+
       {/* top rail */}
       <div style={{ position: 'absolute', top: s(74), left: PAD, right: PAD, display: 'flex', justifyContent: 'space-between' }}>
         <span style={{ fontFamily: MONO, fontSize: s(26), color: DIM, letterSpacing: '0.08em' }}>
@@ -121,7 +148,10 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
       {/* body fallback when there is no terminal block */}
       {lines.length === 0 && slide.bodyText && (
         <div style={{
-          position: 'absolute', left: PAD, right: PAD, top: s(720),
+          position: 'absolute', left: PAD, right: PAD,
+          // With a photo behind, 720 lands the copy on the brightest part of
+          // the frame. Drop it into the faded zone above the footer instead.
+          ...(slide.backgroundImage ? { bottom: s(150) } : { top: s(720) }),
           fontFamily: MONO, fontSize: sf(32), lineHeight: 1.65, color: DIM,
         }}>{slide.bodyText}</div>
       )}

@@ -33,6 +33,7 @@ export interface Slide {
   overlayColor?: string     // '#000000' or '#ffffff'
   bgPanX?: number           // background image horizontal pan: -100 (left) to +100 (right), default 0
   bgPanY?: number           // background image vertical pan: -100 (top) to +100 (bottom), default 0
+  bottomFade?: number       // 0–1: fraction of slide height the fade-to-bg ramp covers
   textScale?: number        // font size multiplier, default 1.0
   footerColor?: string      // color of SAVE FOR LATER / SWIPE text, default '#FFFFFF'
   bodyTextColor?: string    // explicit override for body text color (falls back to auto-computed blend)
