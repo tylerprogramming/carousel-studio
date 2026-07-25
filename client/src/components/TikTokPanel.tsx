@@ -150,37 +150,34 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
     <div style={{ marginBottom: 16 }}>
       <div style={labelStyle}>Exported for TikTok</div>
 
-      {exported.videos.map((v) => (
-        <div key={v.url} style={{ marginBottom: 10 }}>
-          <video src={v.url} controls loop playsInline
-                 style={{ width: '100%', background: '#000', borderRadius: 10, display: 'block' }} />
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-            <span style={{ fontSize: 10, color: MUTED, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {v.filename}
-            </span>
-            <a href={v.url} download style={{ fontSize: 10, color: TIKTOK, fontWeight: 700, textDecoration: 'none' }}>
-              download
-            </a>
-          </div>
-        </div>
-      ))}
+      {/* Videos and slides share one grid at one size. A big inline player took
+          the whole panel for something you mostly just need to confirm exists;
+          clicking a tile opens it full size in a new tab. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}>
+        {exported.videos.map((v) => (
+          <a key={v.url} href={v.url} target="_blank" rel="noreferrer" title={`${v.filename} — click to open`}
+             style={{ position: 'relative', display: 'block', borderRadius: 6, overflow: 'hidden', border: `1px solid ${TIKTOK}` }}>
+            <video src={v.url} autoPlay loop muted playsInline
+                   style={{ width: '100%', aspectRatio: '9 / 16', objectFit: 'cover', display: 'block' }} />
+            <span style={{
+              position: 'absolute', bottom: 2, right: 2, background: TIKTOK, color: WHITE,
+              fontSize: 8, fontWeight: 800, borderRadius: 3, padding: '1px 3px',
+            }}>MP4</span>
+          </a>
+        ))}
+        {exported.tiktokSlides.map((url, i) => (
+          <a key={url} href={url} target="_blank" rel="noreferrer" title={`Slide ${i + 1}`}
+             style={{ display: 'block', borderRadius: 6, overflow: 'hidden', border: `1px solid ${BORDER}` }}>
+            <img src={url} alt={`tiktok slide ${i + 1}`} loading="lazy"
+                 style={{ width: '100%', aspectRatio: '9 / 16', objectFit: 'cover', display: 'block' }} />
+          </a>
+        ))}
+      </div>
 
-      {exported.tiktokSlides.length > 0 && (
-        <>
-          <div style={{ fontSize: 10.5, color: MUTED, margin: '8px 0 6px' }}>
-            {exported.tiktokSlides.length} reframed slides (1080x1920)
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}>
-            {exported.tiktokSlides.map((url, i) => (
-              <a key={url} href={url} target="_blank" rel="noreferrer"
-                 style={{ display: 'block', borderRadius: 6, overflow: 'hidden', border: `1px solid ${BORDER}` }}>
-                <img src={url} alt={`tiktok slide ${i + 1}`} loading="lazy"
-                     style={{ width: '100%', aspectRatio: '9 / 16', objectFit: 'cover', display: 'block' }} />
-              </a>
-            ))}
-          </div>
-        </>
-      )}
+      <div style={{ fontSize: 10, color: MUTED, marginTop: 6 }}>
+        {exported.videos.length > 0 && `${exported.videos.length} video · `}
+        {exported.tiktokSlides.length} reframed slides (1080x1920)
+      </div>
     </div>
   )
 
