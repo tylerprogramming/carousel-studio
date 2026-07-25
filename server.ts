@@ -21,6 +21,19 @@ function exportDir(): string {
   return expandPath(configured)
 }
 
+/** Content type for a served media file. One source of truth: every route
+ *  that streams from disk had its own guess, and each defaulted to an image
+ *  type, so an mp4 came back labelled as a picture and would not play. */
+function mediaType(name: string): string {
+  const ext = name.slice(name.lastIndexOf('.')).toLowerCase()
+  return ({
+    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp', '.gif': 'image/gif',
+    '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm',
+    '.pdf': 'application/pdf',
+  } as Record<string, string>)[ext] ?? 'application/octet-stream'
+}
+
 /** `~` in a configured path means the user's home directory. */
 function expandPath(p: string): string {
   return p.startsWith('~')
@@ -1007,11 +1020,10 @@ app.get('/local-images/*', async (c) => {
   const rel = new URL(c.req.url).pathname.slice('/local-images/'.length)
   const filePath = resolveMediaPath(`/local-images/${rel}`)
   if (!filePath) return c.text('Not found', 404)
-  const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase()
-  const type = ext === '.png' ? 'image/png'
-    : ext === '.webp' ? 'image/webp'
-    : 'image/jpeg'
-  return new Response(Bun.file(filePath), { headers: { 'Content-Type': type, 'Cache-Control': 'no-store' } })
+  return new Response(Bun.file(filePath), {
+    headers: { 'Content-Type': mediaType(filePath), 'Cache-Control': 'no-store',
+               'Accept-Ranges': 'bytes' },
+  })
 })
 
 app.delete('/api/images/:filename', (c) => {
@@ -1030,14 +1042,9 @@ app.get('/carousel-output/:slug/:filename', async (c) => {
   const filePath = resolveMediaPath(`/carousel-output/${slug}/${filename}`)
   if (!filePath) return c.text('Not found', 404)
   const file = Bun.file(filePath)
-  const ext = filename.slice(filename.lastIndexOf('.')).toLowerCase()
-  const contentType = ext === '.pdf'  ? 'application/pdf'
-    : ext === '.mp4'  ? 'video/mp4'
-    : ext === '.mov'  ? 'video/quicktime'
-    : ext === '.webm' ? 'video/webm'
-    : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg'
-    : 'image/png'
-  const disposition = ext === '.pdf' ? `attachment; filename="${filename}"` : 'inline'
+  const contentType = mediaType(filename)
+  const disposition = contentType === 'application/pdf'
+    ? `attachment; filename="${filename}"` : 'inline'
   return new Response(file, {
     // Accept-Ranges lets the player seek instead of refusing to scrub
     headers: { 'Content-Type': contentType, 'Cache-Control': 'no-store',

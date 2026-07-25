@@ -15,7 +15,8 @@ and writes 1080x1350 h264. Note this is NOT flash_video.py, which targets
 Usage: python3 slide_video.py '<json payload>'
 
 Payload:
-  overlay   : PNG with alpha, from generate_slide.py `transparent`   (required)
+  overlay   : PNG with alpha, from generate_slide.py `transparent`
+              (omit for a background-only clip the editor plays under text)
   source    : still image or video to sit underneath                 (optional)
   audio     : audio file to lay under it                             (optional)
   duration  : seconds, default 5
@@ -40,7 +41,7 @@ def run(cmd):
 
 
 def build(cfg):
-    overlay = cfg['overlay']
+    overlay = cfg.get('overlay') or ''
     source = cfg.get('source') or ''
     audio = cfg.get('audio') or ''
     dur = float(cfg.get('duration', 5))
@@ -58,7 +59,8 @@ def build(cfg):
     else:
         # No source: a flat colour bed, so the overlay still becomes a video
         cmd += ['-f', 'lavfi', '-t', f'{dur}', '-i', f'color=c=black:s={W}x{H}:r={FPS}']
-    cmd += ['-i', overlay]
+    if overlay:
+        cmd += ['-i', overlay]
     if audio:
         cmd += ['-i', audio]
 
@@ -79,7 +81,10 @@ def build(cfg):
             f"crop={W}:{H},fps={FPS}"
         )
 
-    fc = f"[0:v]{bg}[bg];[1:v]scale={W}:{H}[ov];[bg][ov]overlay=0:0:format=auto[v]"
+    if overlay:
+        fc = f"[0:v]{bg}[bg];[1:v]scale={W}:{H}[ov];[bg][ov]overlay=0:0:format=auto[v]"
+    else:
+        fc = f"[0:v]{bg}[v]"
     cmd += ['-filter_complex', fc, '-map', '[v]']
 
     if audio:
@@ -87,7 +92,7 @@ def build(cfg):
         fade_out = max(0.0, dur - 0.6)
         cmd += ['-filter_complex' if False else '-af',
                 f'afade=t=in:st=0:d=0.3,afade=t=out:st={fade_out:.2f}:d=0.6']
-        cmd += ['-map', '2:a', '-c:a', 'aac', '-b:a', '192k']
+        cmd += ['-map', f'{2 if overlay else 1}:a', '-c:a', 'aac', '-b:a', '192k']
     else:
         cmd += ['-an']
 
@@ -102,7 +107,7 @@ def main():
         print('usage: slide_video.py <json>', file=sys.stderr)
         sys.exit(1)
     cfg = json.loads(sys.argv[1])
-    for k in ('overlay', 'output'):
+    for k in ('output',):
         if not cfg.get(k):
             print(f'missing required key: {k}', file=sys.stderr)
             sys.exit(1)

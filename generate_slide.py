@@ -258,16 +258,27 @@ def generate_terminal_slide(data):
 
     # Optional photo behind the terminal chrome. Cover-cropped like the CSS
     # `object-fit: cover` the preview uses, so framing matches the export.
-    bg_path = data.get('backgroundImagePath')
-    has_photo = bool(bg_path and os.path.exists(bg_path)) and not transparent
-    if has_photo:
+    # video_first_frame returns an Image, not a path, so resolve to an Image
+    # here rather than mixing the two.
+    src = None
+    if not transparent:
         try:
-            src = Image.open(bg_path).convert('RGB')
-            img.paste(cover_crop(src, WIDTH, HEIGHT,
-                                 50 + float(data.get('bgPanX', 0) or 0) / 2,
-                                 50 + float(data.get('bgPanY', 0) or 0) / 2), (0, 0))
+            vid_path = data.get('backgroundVideoPath')
+            bg_path = data.get('backgroundImagePath')
+            if vid_path and os.path.exists(vid_path):
+                # The still export of a moving slide is its first frame
+                src = video_first_frame(vid_path)
+            if src is None and bg_path and os.path.exists(bg_path):
+                src = Image.open(bg_path)
+            if src is not None:
+                src = src.convert('RGB')
         except Exception:
-            pass
+            src = None
+    has_photo = src is not None
+    if has_photo:
+        img.paste(cover_crop(src, WIDTH, HEIGHT,
+                             50 + float(data.get('bgPanX', 0) or 0) / 2,
+                             50 + float(data.get('bgPanY', 0) or 0) / 2), (0, 0))
 
     # Bottom fade: a vertical ramp to the slide's own background colour, so the
     # photo dissolves into the slide instead of stopping at a hard edge. Value

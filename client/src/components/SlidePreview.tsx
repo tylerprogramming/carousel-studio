@@ -47,8 +47,21 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
       width: W, height: H, position: 'relative', overflow: 'hidden', flexShrink: 0,
       background: BG, fontFamily: "'Inter', system-ui, sans-serif",
     }}>
+      {/* Moving background, so the editor shows what the mp4 export will do. */}
+      {slide.backgroundVideo && (
+        <video
+          src={slide.backgroundVideo}
+          autoPlay loop muted playsInline
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover',
+            objectPosition: `${50 + (slide.bgPanX ?? 0) / 2}% ${50 + (slide.bgPanY ?? 0) / 2}%`,
+          }}
+        />
+      )}
+
       {/* Optional photo behind the chrome. Mirrored in generate_slide.py. */}
-      {slide.backgroundImage && (
+      {slide.backgroundImage && !slide.backgroundVideo && (
         <img
           src={slide.backgroundImage}
           alt=""
