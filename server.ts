@@ -931,42 +931,79 @@ app.get('/api/flash-videos', (c) => {
 // GET /api/exports
 // Everything previously exported to disk, newest first. This is distinct from
 // /api/carousels: those are editable projects, these are finished output.
+// A carousel folder holds the default set at its root, and one subfolder per
+// platform variant (tiktok/, linkedin/, …). Variants were invisible before:
+// you could not tell from the UI that a TikTok set existed, let alone view it.
+function readSlideSet(dir: string, urlPrefix: string) {
+  let files: string[] = []
+  try { files = readdirSync(dir) } catch { return null }
+
+  // slide_1.png, slide_2.mp4 … sorted numerically, not lexically. A slide can
+  // be a video, and an mp4 wins over a png of the same number since it is the
+  // newer artifact for that slide.
+  const byNumber = new Map<number, string>()
+  for (const f of files) {
+    const m = f.match(/^slide_(\d+)\.(png|mp4)$/i)
+    if (!m) continue
+    const n = parseInt(m[1])
+    if (!byNumber.has(n) || m[2].toLowerCase() === 'mp4') byNumber.set(n, f)
+  }
+  const slides = [...byNumber.entries()].sort((a, b) => a[0] - b[0]).map(([, f]) => f)
+  if (!slides.length) return null
+
+  let modified = 0
+  try { modified = statSync(join(dir, slides[0])).mtimeMs } catch { /* ignore */ }
+
+  return {
+    slideCount: slides.length,
+    slides: slides.map((f) => `${urlPrefix}/${f}`),
+    cover: `${urlPrefix}/${slides[0]}`,
+    files,
+    modified,
+  }
+}
+
 app.get('/api/exports', (c) => {
   const dir = exportDir()
-  if (!existsSync(dir)) return c.json([])
+  if (!existsSync(dir)) return c.json({ exportDir: dir, carousels: [] })
 
   const entries = readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => {
       const slugDir = join(dir, e.name)
-      let files: string[] = []
-      try { files = readdirSync(slugDir) } catch { return null }
+      const base = `/carousel-output/${encodeURIComponent(e.name)}`
+      const root = readSlideSet(slugDir, base)
+      if (!root) return null
 
-      // slide_1.png, slide_2.mp4 … sorted numerically, not lexically. A slide
-      // can be a video, and an mp4 wins over a png of the same number since it
-      // is the newer artifact for that slide.
-      const byNumber = new Map<number, string>()
-      for (const f of files) {
-        const m = f.match(/^slide_(\d+)\.(png|mp4)$/i)
-        if (!m) continue
-        const n = parseInt(m[1])
-        if (!byNumber.has(n) || m[2].toLowerCase() === 'mp4') byNumber.set(n, f)
+      // Any subfolder holding slide_N files is a platform variant, named after
+      // the folder. Nothing is hardcoded, so a new one just shows up.
+      const variants: Record<string, any> = {}
+      let subdirs: string[] = []
+      try {
+        subdirs = readdirSync(slugDir, { withFileTypes: true })
+          .filter((d) => d.isDirectory()).map((d) => d.name)
+      } catch { /* ignore */ }
+      for (const name of subdirs) {
+        const set = readSlideSet(join(slugDir, name), `${base}/${encodeURIComponent(name)}`)
+        if (set) variants[name] = { slideCount: set.slideCount, slides: set.slides, cover: set.cover, modified: set.modified }
       }
-      const slides = [...byNumber.entries()].sort((a, b) => a[0] - b[0]).map(([, f]) => f)
-      if (!slides.length) return null
 
-      const pdf = files.find((f) => f.toLowerCase().endsWith('.pdf'))
-      let modified = 0
-      try { modified = statSync(join(slugDir, slides[0])).mtimeMs } catch { /* ignore */ }
+      const pdf = root.files.find((f) => f.toLowerCase().endsWith('.pdf'))
+      // A variant older than the default set means someone re-exported and the
+      // variant was left behind. Surfacing it beats silently posting stale art.
+      const stale = Object.keys(variants).filter((k) => variants[k].modified < root.modified - 1000)
 
       return {
         slug: e.name,
-        slideCount: slides.length,
-        slides: slides.map((f) => `/carousel-output/${encodeURIComponent(e.name)}/${f}`),
-        cover: `/carousel-output/${encodeURIComponent(e.name)}/${slides[0]}`,
-        pdf: pdf ? `/carousel-output/${encodeURIComponent(e.name)}/${pdf}` : null,
-        hasCaptions: files.includes('captions.md'),
-        modified,
+        slideCount: root.slideCount,
+        slides: root.slides,
+        cover: root.cover,
+        pdf: pdf ? `${base}/${pdf}` : null,
+        hasCaptions: root.files.includes('captions.md'),
+        modified: root.modified,
+        variants,                       // { tiktok: {...}, … }
+        platforms: ['default', ...Object.keys(variants)],
+        staleVariants: stale,
       }
     })
     .filter(Boolean) as any[]

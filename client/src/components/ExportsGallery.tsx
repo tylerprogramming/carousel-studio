@@ -8,6 +8,13 @@ import { cn } from '../lib/utils'
  * finished output — the PNG sets and PDFs sitting in the export directory.
  */
 
+interface SlideSet {
+  slideCount: number
+  slides: string[]
+  cover: string
+  modified: number
+}
+
 interface ExportedCarousel {
   slug: string
   slideCount: number
@@ -16,7 +23,17 @@ interface ExportedCarousel {
   pdf: string | null
   hasCaptions: boolean
   modified: number
+  /** Platform variants keyed by folder name, e.g. { tiktok: {...} } */
+  variants?: Record<string, SlideSet>
+  /** Variants older than the default set — re-exported without them */
+  staleVariants?: string[]
 }
+
+/** Short label for a platform chip. */
+const PLATFORM_LABEL: Record<string, string> = {
+  default: 'IG', tiktok: 'TikTok', linkedin: 'LinkedIn', instagram: 'IG',
+}
+const labelFor = (key: string) => PLATFORM_LABEL[key] ?? key
 
 interface Props { onClose: () => void }
 
@@ -53,6 +70,9 @@ export default function ExportsGallery({ onClose }: Props) {
   const [dir, setDir] = useState('')
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState<ExportedCarousel | null>(null)
+  // Which platform set the detail pane is showing. Reset when the card changes.
+  const [platform, setPlatform] = useState('default')
+  useEffect(() => { setPlatform('default') }, [open?.slug])
   const [captions, setCaptions] = useState<string | null>(null)
   const [query, setQuery] = useState('')
 
@@ -131,6 +151,22 @@ export default function ExportsGallery({ onClose }: Props) {
                       <span>{timeAgo(c.modified)}</span>
                       {c.pdf && <span className="rounded bg-secondary px-1">PDF</span>}
                       {c.hasCaptions && <span className="rounded bg-secondary px-1">CAP</span>}
+                      {Object.keys(c.variants ?? {}).map((key) => (
+                        <span
+                          key={key}
+                          title={c.staleVariants?.includes(key)
+                            ? `${labelFor(key)} set is older than the main set — re-export it`
+                            : `${labelFor(key)} version available`}
+                          className={cn(
+                            'rounded px-1',
+                            c.staleVariants?.includes(key)
+                              ? 'bg-destructive/15 text-destructive'
+                              : 'bg-brand/15 text-brand',
+                          )}
+                        >
+                          {labelFor(key)}{c.staleVariants?.includes(key) ? ' !' : ''}
+                        </span>
+                      ))}
                     </div>
                   </div>
                 </button>
@@ -145,7 +181,8 @@ export default function ExportsGallery({ onClose }: Props) {
                 <div className="min-w-0">
                   <div className="truncate text-sm font-bold text-foreground">{open.slug}</div>
                   <div className="text-[11px] text-muted-foreground">
-                    {open.slideCount} slides · {timeAgo(open.modified)}
+                    {(platform === 'default' ? open.slideCount : open.variants?.[platform]?.slideCount ?? 0)} slides
+                    {platform !== 'default' && ` · ${labelFor(platform)}`} · {timeAgo(open.modified)}
                   </div>
                 </div>
                 <button onClick={() => setOpen(null)} className="text-lg leading-none text-muted-foreground">×</button>
@@ -164,11 +201,42 @@ export default function ExportsGallery({ onClose }: Props) {
                 </a>
               </div>
 
-              <div className="mb-4 grid grid-cols-3 gap-2">
-                {open.slides.map((s, i) => (
+              {Object.keys(open.variants ?? {}).length > 0 && (
+                <div className="mb-3 flex gap-1">
+                  {['default', ...Object.keys(open.variants ?? {})].map((key) => (
+                    <button
+                      key={key}
+                      onClick={() => setPlatform(key)}
+                      className={cn(
+                        'rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all',
+                        platform === key
+                          ? 'bg-brand text-white'
+                          : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                      )}
+                    >
+                      {labelFor(key)}
+                      {open.staleVariants?.includes(key) && ' !'}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {open.staleVariants?.includes(platform) && (
+                <p className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-[11px] text-destructive">
+                  This set is older than the main one. It was not refreshed on the last
+                  export, so posting it would ship stale slides.
+                </p>
+              )}
+
+              <div className={cn('mb-4 grid gap-2', platform === 'default' ? 'grid-cols-3' : 'grid-cols-4')}>
+                {(platform === 'default' ? open.slides : open.variants?.[platform]?.slides ?? []).map((s, i) => (
                   <a key={s} href={s} target="_blank" rel="noreferrer"
                      className="overflow-hidden rounded-md border border-border hover:border-brand">
-                    <SlideMedia src={s} alt={`slide ${i + 1}`} className="aspect-[4/5] w-full object-cover" />
+                    <SlideMedia
+                      src={s}
+                      alt={`slide ${i + 1}`}
+                      className={cn('w-full object-cover', platform === 'default' ? 'aspect-[4/5]' : 'aspect-[9/16]')}
+                    />
                   </a>
                 ))}
               </div>
