@@ -103,7 +103,7 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
               display: 'inline', background: AC, color: BG,
               // lineHeight matches the pill height so wrapped lines stack flush
               // and read as one highlight, mirroring generate_slide.py
-              fontSize: sf(44), fontWeight: 700, lineHeight: 1.66,
+              fontSize: sf(50), fontWeight: 700, lineHeight: 1.66,
               padding: `${s(10)}px ${s(18)}px`, borderRadius: 0,
               boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone',
             } as React.CSSProperties}>{slide.emphasisLine}</span>

@@ -313,9 +313,9 @@ def generate_terminal_slide(data):
     if emphasis:
         if stype == 'cover':
             # One pill per wrapped line, mirroring box-decoration-break: clone
-            f_e = load_font(fs(44), 700)
+            f_e = load_font(fs(50), 700)
             avail = WIDTH - PADX * 2 - 40
-            pill_h = fs(44) + 20
+            pill_h = fs(50) + 20
             for line in wrap_text(d, emphasis, f_e, avail):
                 tw = d.textbbox((0, 0), line, font=f_e)[2]
                 # Square corners, and advance by exactly the pill height so
