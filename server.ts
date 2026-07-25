@@ -64,6 +64,11 @@ function writeSettings(data: Record<string, any>) {
   writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2))
 }
 
+/** Export folder name for a carousel title. Mirrored by slugify() in App.tsx. */
+function slugFromTitle(title: string): string {
+  return (title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'carousel'
+}
+
 /** Creator handle shown on CTA slides and in the platform preview mockups. */
 function creatorHandle(): string {
   const h = (readSettings().handle || '@yourhandle').trim()
@@ -162,7 +167,30 @@ app.get('/api/carousels', (c) => {
     .map((f) => {
       try {
         const d = JSON.parse(readFileSync(join(CAROUSELS_DIR, f), 'utf8'))
-        return { id: d.id, title: d.title, platform: d.platform, slideCount: d.slides?.length ?? 0, savedAt: d.savedAt }
+        // What has actually been exported for this carousel, so the Library can
+        // say whether an Instagram, TikTok or video version exists rather than
+        // making you open the Exports gallery to find out.
+        const slug = slugFromTitle(d.title)
+        const slugDir = join(exportDir(), slug)
+        let exported: string[] = []
+        let hasVideo = false
+        if (existsSync(slugDir)) {
+          try {
+            const files = readdirSync(slugDir, { withFileTypes: true })
+            if (files.some((x) => x.isFile() && /^slide_\d+\.(png|mp4)$/i.test(x.name))) exported.push('default')
+            for (const sub of files.filter((x) => x.isDirectory())) {
+              try {
+                if (readdirSync(join(slugDir, sub.name)).some((n) => /^slide_\d+\./i.test(n))) exported.push(sub.name)
+              } catch { /* ignore */ }
+            }
+            hasVideo = files.some((x) => x.isFile() && /\.(mp4|mov|webm)$/i.test(x.name) && !/^slide_\d+\./i.test(x.name))
+          } catch { /* ignore */ }
+        }
+        return {
+          id: d.id, title: d.title, platform: d.platform,
+          slideCount: d.slides?.length ?? 0, savedAt: d.savedAt,
+          slug, exported, hasVideo,
+        }
       } catch { return null }
     })
     .filter(Boolean)

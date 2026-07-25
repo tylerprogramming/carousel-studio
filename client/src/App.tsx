@@ -33,8 +33,11 @@ const PLATFORMS = [
 
 function newId() { return `carousel_${Date.now()}` }
 
+// Collapses any run of non-alphanumerics to a single dash. Must stay in step
+// with slugFromTitle() in server.ts, or exporting writes to a second folder
+// and the first one silently goes stale.
 function slugify(title: string) {
-  return title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') || 'carousel'
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'carousel'
 }
 
 export default function App() {
@@ -530,7 +533,7 @@ export default function App() {
                 slides={config.slides} activeIndex={activeIndex} onSelect={handleSelect}
                 onAdd={addSlide} onRemove={removeSlide} onReorder={reorder} onDuplicate={duplicateSlide}
               />
-              <TikTokPanel slides={config.slides} activeIndex={activeIndex} carouselId={carouselId} />
+              <TikTokPanel slides={config.slides} activeIndex={activeIndex} carouselId={carouselId} carouselTitle={config.title} />
             </>
           ) : (
             <>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BG, BLUE, BLUE_HOVER, BLUE_LIGHT, BORDER, MUTED, TEXT, WHITE } from '../lib/tokens'
+import { BG, BLUE, BLUE_HOVER, BLUE_LIGHT, BORDER, CORAL, MUTED, TEXT, WHITE } from '../lib/tokens'
 
 interface CarouselMeta {
   id: string
@@ -8,6 +8,15 @@ interface CarouselMeta {
   savedAt: string
   updatedAt: string
   platform: string
+  /** Platform sets already on disk: 'default' (Instagram 4:5), 'tiktok', … */
+  exported?: string[]
+  /** A whole-carousel video has been rendered */
+  hasVideo?: boolean
+}
+
+/** Short label for an exported set. 'default' is the 4:5 Instagram export. */
+const EXPORT_LABEL: Record<string, string> = {
+  default: 'IG', tiktok: 'TT', linkedin: 'LI', instagram: 'IG',
 }
 
 interface Props {
@@ -146,6 +155,20 @@ export default function SavedCarouselsDrawer({ onClose, onLoad, onNew, currentId
                     <span style={{ fontSize: 10 }}>{platformIcon(c.platform)}</span>
                     <span style={{ fontSize: 11.5, color: MUTED }}>{formatDate(c.savedAt || c.updatedAt)}</span>
                     {isCurrent && <span style={{ fontSize: 10, background: BLUE, color: WHITE, borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>Active</span>}
+                    {/* What exists on disk, so you do not have to open Exports to find out */}
+                    {(c.exported ?? []).map((key) => (
+                      <span key={key}
+                            title={`${EXPORT_LABEL[key] ?? key} version exported`}
+                            style={{ fontSize: 9.5, background: BLUE_LIGHT, color: BLUE, borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>
+                        {EXPORT_LABEL[key] ?? key}
+                      </span>
+                    ))}
+                    {c.hasVideo && (
+                      <span title="A full-carousel video has been rendered"
+                            style={{ fontSize: 9.5, background: '#FEE9E3', color: CORAL, borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>
+                        MP4
+                      </span>
+                    )}
                   </div>
                 </div>
 

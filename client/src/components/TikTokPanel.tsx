@@ -15,6 +15,13 @@ interface Props {
   slides: Slide[]
   activeIndex: number
   carouselId: string
+  /** Used to find what has already been exported for this carousel */
+  carouselTitle: string
+}
+
+/** Mirrors slugify() in App.tsx and slugFromTitle() in server.ts. */
+function exportSlug(title: string) {
+  return (title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'carousel'
 }
 
 function TikTokIcon({ size = 16 }: { size?: number }) {
@@ -39,9 +46,32 @@ const inputStyle: React.CSSProperties = {
   transition: 'border-color 0.15s',
 }
 
-export default function TikTokPanel({ slides, activeIndex, carouselId }: Props) {
+export default function TikTokPanel({ slides, activeIndex, carouselId, carouselTitle }: Props) {
   const { handle, username } = useSettings()
   const slide = slides[activeIndex] ?? slides[0]
+
+  // What already exists on disk for this carousel: the reframed TikTok slides
+  // and any full-carousel video. Fetched here so choosing TikTok shows the real
+  // output, not just a mockup of the Instagram slides.
+  const [exported, setExported] = useState<{
+    videos: { filename: string; url: string }[]
+    tiktokSlides: string[]
+  }>({ videos: [], tiktokSlides: [] })
+  const [playing, setPlaying] = useState<string | null>(null)
+
+  const slug = exportSlug(carouselTitle)
+  const loadExported = useCallback(async () => {
+    try {
+      const res = await fetch('/api/exports')
+      const data = await res.json()
+      const match = (data.carousels ?? []).find((c: any) => c.slug === slug)
+      setExported({
+        videos: match?.videos ?? [],
+        tiktokSlides: match?.variants?.tiktok?.slides ?? [],
+      })
+    } catch { /* leave empty */ }
+  }, [slug])
+  useEffect(() => { loadExported() }, [loadExported])
 
   // TT-specific text — separate from carousel, initialized from slide
   const [ttText, setTtText] = useState<TtText>({
@@ -117,6 +147,48 @@ export default function TikTokPanel({ slides, activeIndex, carouselId }: Props) 
   const SCALE   = SLIDE_W / 1080
   const slideTop = Math.round((PHONE_H - SLIDE_H) / 2)
 
+  const exportedBlock = (exported.videos.length > 0 || exported.tiktokSlides.length > 0) && (
+    <div style={{ marginBottom: 16 }}>
+      <div style={labelStyle}>Exported for TikTok</div>
+
+      {playing && (
+        <video src={playing} controls autoPlay loop playsInline
+               style={{ width: '100%', maxHeight: 380, background: '#000', borderRadius: 10, marginBottom: 8 }} />
+      )}
+
+      {exported.videos.map((v) => (
+        <button key={v.url} onClick={() => setPlaying(v.url)}
+                title={v.filename}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left', marginBottom: 6,
+                  padding: '7px 10px', borderRadius: 8, fontSize: 11.5, fontWeight: 700,
+                  border: `1px solid ${playing === v.url ? TIKTOK : BORDER}`,
+                  color: playing === v.url ? TIKTOK : MUTED, background: WHITE, cursor: 'pointer',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+          ▶ {v.filename}
+        </button>
+      ))}
+
+      {exported.tiktokSlides.length > 0 && (
+        <>
+          <div style={{ fontSize: 10.5, color: MUTED, margin: '8px 0 6px' }}>
+            {exported.tiktokSlides.length} reframed slides (1080x1920)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}>
+            {exported.tiktokSlides.map((url, i) => (
+              <a key={url} href={url} target="_blank" rel="noreferrer"
+                 style={{ display: 'block', borderRadius: 6, overflow: 'hidden', border: `1px solid ${BORDER}` }}>
+                <img src={url} alt={`tiktok slide ${i + 1}`} loading="lazy"
+                     style={{ width: '100%', aspectRatio: '9 / 16', objectFit: 'cover', display: 'block' }} />
+              </a>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden', background: BG }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -175,6 +247,7 @@ export default function TikTokPanel({ slides, activeIndex, carouselId }: Props) 
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {exportedBlock}
 
           {/* Style */}
           <div>
