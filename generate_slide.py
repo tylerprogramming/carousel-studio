@@ -343,15 +343,23 @@ def generate_terminal_slide(data):
                font=load_mono(24), fill=dim)
         ly = win_top + 62 + 26
         for ln in [mono_safe(l) for l in lines]:
-            col = fg if ln.startswith('$') else ((110, 220, 140) if ln.lstrip().startswith('✓') else dim)
+            col = fg if ln[:1] in ('$', '>') else ((110, 220, 140) if ln.lstrip().startswith('✓') else dim)
             d.text((PADX + 30, ly), ln, font=f_line, fill=col)
             ly += line_h
-    elif (data.get('bodyText') or '').strip():
+    if (data.get('bodyText') or '').strip():
         f_b = load_mono(fs(32))
-        # With a photo behind, 720 lands the copy on the brightest part of the
-        # frame. Drop it into the faded zone above the footer instead.
         n_lines = len(wrap_text(d, data['bodyText'].strip(), f_b, WIDTH - PADX * 2))
-        by = (HEIGHT - 150 - n_lines * round(fs(32) * 1.65)) if has_photo else 720
+        line_adv = round(fs(32) * 1.65)
+        if lines:
+            # Body sits under the terminal window rather than being dropped.
+            # A short block leaves most of the slide empty otherwise.
+            by = win_top + win_h + 46
+        elif has_photo:
+            # At 720 the copy lands on the brightest part of the photo.
+            # Drop it into the faded zone above the footer instead.
+            by = HEIGHT - 150 - n_lines * line_adv
+        else:
+            by = 720
         body_fill = hex_to_rgb(data['bodyTextColor']) if data.get('bodyTextColor') else fg
         for ln in wrap_text(d, data['bodyText'].strip(), f_b, WIDTH - PADX * 2):
             d.text((PADX, by), ln, font=f_b, fill=body_fill)

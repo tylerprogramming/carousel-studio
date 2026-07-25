@@ -133,7 +133,9 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
           </div>
           <div style={{ padding: `${s(26)}px ${s(30)}px` }}>
             {lines.map((ln, i) => {
-              const isCmd = ln.startsWith('$');
+              // '>' is the Claude Code prompt; '$' is a shell
+              // '>' is the Claude Code prompt, '$' a shell. Mirrored in generate_slide.py.
+              const isCmd = ln.startsWith('$') || ln.startsWith('>')
               const isOk = ln.trimStart().startsWith('✓')
               return (
                 <div key={i} style={{
@@ -147,13 +149,15 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
         </div>
       )}
 
-      {/* body fallback when there is no terminal block */}
-      {lines.length === 0 && slide.bodyText && (
+      {/* Body copy. Sits under the terminal window when there is one. */}
+      {slide.bodyText && (
         <div style={{
           position: 'absolute', left: PAD, right: PAD,
           // With a photo behind, 720 lands the copy on the brightest part of
           // the frame. Drop it into the faded zone above the footer instead.
-          ...(slide.backgroundImage ? { bottom: s(150) } : { top: s(720) }),
+          ...(lines.length > 0
+            ? { top: s(700) + s(62 + 52 + Math.round(29 * 1.9) * lines.length) + s(46) }
+            : slide.backgroundImage ? { bottom: s(150) } : { top: s(720) }),
           fontFamily: MONO, fontSize: sf(32), lineHeight: 1.65,
           color: slide.bodyTextColor || FG,
         }}>{slide.bodyText}</div>
