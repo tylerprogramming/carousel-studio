@@ -11,6 +11,8 @@ carousels/
 exports/
 images/
 !images/README.md
+audio/
+!audio/README.md
 settings.json
 
 # Environment & secrets

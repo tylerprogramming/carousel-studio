@@ -5,5 +5,6 @@
   "exportDir": "Optional. Where exported carousels are written. Defaults to ./exports. Supports ~ for your home directory.",
   "likenessPath": "Optional. Absolute path to a photo of you, used as a reference image when 'Use my likeness' is checked.",
   "likenessDescription": "Optional. Appended to the image prompt so the model gets your appearance right, e.g. 'The person in the image is a young adult male. Always generate a male person, not female.'",
-  "communityUrl": "Optional. Community or link-in-bio URL shown on flash-video footers, e.g. 'skool.com/your-community'. Left blank, the line is omitted."
+  "communityUrl": "Optional. Community or link-in-bio URL shown on flash-video footers, e.g. 'skool.com/your-community'. Left blank, the line is omitted.",
+  "audioPath": "Optional. Default audio bed for generated videos, e.g. 'audio/my-bed.mp3'. Relative to the app, or absolute. Supports ~."
 }
