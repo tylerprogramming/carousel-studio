@@ -19,6 +19,9 @@ export default defineConfig({
       // Export links point at /carousel-output/<slug>/… — without this the dev
       // server answers them with index.html and the downloads silently fail.
       '/carousel-output': 'http://localhost:3010',
+      // Same trap for the local image library: the SPA fallback returns HTML
+      // where an <img> expects a PNG, so backgrounds render as broken icons.
+      '/local-images': 'http://localhost:3010',
     },
   },
 })
