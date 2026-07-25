@@ -50,11 +50,18 @@ function imagesDir(): string {
 }
 const SETTINGS_FILE         = join(import.meta.dir, 'settings.json')
 
+// Cached: readSettings() reads like a cheap accessor, which is how it ended up
+// inside the per-slide export loop. It is a readFileSync + JSON.parse.
+let settingsCache: Record<string, any> | null = null
 function readSettings(): Record<string, any> {
-  try { return JSON.parse(readFileSync(SETTINGS_FILE, 'utf8')) } catch { return {} }
+  if (settingsCache) return settingsCache
+  try { settingsCache = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8')) } catch { settingsCache = {} }
+  return settingsCache!
 }
 function writeSettings(data: Record<string, any>) {
-  writeFileSync(SETTINGS_FILE, JSON.stringify({ ...readSettings(), ...data }, null, 2))
+  const merged = { ...readSettings(), ...data }
+  settingsCache = null
+  writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2))
 }
 
 /** Creator handle shown on CTA slides and in the platform preview mockups. */
@@ -195,8 +202,8 @@ app.get('/api/frameworks', (c) => {
       const raw = readFileSync(join(FRAMEWORKS_DIR, f), 'utf8')
       const fw = JSON.parse(raw)
       // Don't send the full systemPrompt to the client - keep it server-side
-      const { systemPrompt, ...rest } = fw
-      return rest
+      const { systemPrompt, ...publicFramework } = fw
+      return publicFramework
     })
     return c.json(frameworks)
   } catch (err) {
@@ -249,7 +256,7 @@ app.post('/api/bulk-generate', async (c) => {
   return c.json({ results })
 })
 
-function parseJSON(text: string): { slides: any[]; title: string } {
+function parseSlidesReply(text: string): { slides: any[]; title: string } {
   // Strip markdown code fences if present
   const cleaned = text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim()
   const parsed = JSON.parse(cleaned)
@@ -373,7 +380,7 @@ Every slide needs real content written for its specific purpose — no placehold
     }
     // output_config.format guarantees the first text block is valid JSON
     const text = message.content.find((b) => b.type === 'text')?.text ?? '{}'
-    const parsed = parseJSON(text)
+    const parsed = parseSlidesReply(text)
     slides = parsed.slides; title = parsed.title
   } else {
     // Fallback path. Uses the same JSON Schema as the Claude path via OpenAI's
@@ -392,7 +399,7 @@ Every slide needs real content written for its specific purpose — no placehold
     })
     if (!res.ok) throw new Error(`OpenAI API error ${res.status}: ${await res.text()}`)
     const data = await res.json() as any
-    const parsed = parseJSON(data.choices?.[0]?.message?.content ?? '{}')
+    const parsed = parseSlidesReply(data.choices?.[0]?.message?.content ?? '{}')
     slides = parsed.slides; title = parsed.title
   }
 
@@ -505,11 +512,11 @@ Write captions for this carousel.`
     }
 
     // Strip em dashes defensively — a standing rule for this creator's content
-    const clean = (s: string) => (s || '').replace(/\s*—\s*/g, ' ')
+    const stripEmDashes = (s: string) => (s || '').replace(/\s*—\s*/g, ' ')
     const captions = {
-      instagram: clean(parsed.instagram),
+      instagram: stripEmDashes(parsed.instagram),
       hashtags:  (parsed.hashtags ?? []).map((h) => (h.startsWith('#') ? h : `#${h}`)),
-      linkedin:  clean(parsed.linkedin),
+      linkedin:  stripEmDashes(parsed.linkedin),
     }
 
     let savedTo: string | null = null
@@ -694,7 +701,7 @@ app.post('/api/jobs/generate-bg', async (c) => {
         referenceImages: refs,
         model,
       })
-      const proc = Bun.spawn(['python3', bgScript, payload], { stdout: 'pipe', stderr: 'pipe' })
+      const proc = Bun.spawn(['python3', bgScript, payload], { stdout: 'ignore', stderr: 'pipe' })
       job.procs.add(proc as any)
       try {
         const code = await proc.exited
@@ -733,9 +740,10 @@ app.post('/api/generate-slide', async (c) => {
   const payload = JSON.stringify({ ...slideData, handle: creatorHandle(), output: outputPath })
   const scriptPath = join(import.meta.dir, 'generate_slide.py')
 
-  const proc = Bun.spawn(['python3', scriptPath, payload], { stdout: 'pipe', stderr: 'pipe' })
-  const exitCode = await proc.exited
-  const stderr = await new Response(proc.stderr).text()
+  const proc = Bun.spawn(['python3', scriptPath, payload], { stdout: 'ignore', stderr: 'pipe' })
+  const [exitCode, stderr] = await Promise.all([
+    proc.exited, new Response(proc.stderr).text(),
+  ])
 
   if (exitCode !== 0) return c.json({ error: `PIL generation failed: ${stderr}` }, 500)
   return c.json({ url: `/files/${filename}`, filename })
@@ -752,6 +760,7 @@ app.post('/api/export-all', async (c) => {
 
   // Step 1: always generate PNGs — rendered in parallel, one python process per slide
   type Render = { slide: any; filename: string; outputPath: string; payload: string }
+  const handle = creatorHandle()   // invariant across the batch
   const renders: Render[] = slides.map((slide: any) => {
     const filename   = `slide_${slide.slideNumber}.png`
     const outputPath = join(slugDir, filename)
@@ -760,7 +769,7 @@ app.post('/api/export-all', async (c) => {
     const payload = JSON.stringify({
       ...slide,
       totalSlides:        slides.length,
-      handle:             creatorHandle(),
+      handle,
       backgroundImagePath: resolveMediaPath(slide.backgroundImage) ?? undefined,
       backgroundVideoPath: resolveMediaPath(slide.backgroundVideo) ?? undefined,
       insetImagePath:      resolveMediaPath(slide.insetImageUrl) ?? undefined,
@@ -770,7 +779,7 @@ app.post('/api/export-all', async (c) => {
   })
 
   const outcomes = await Promise.all(renders.map(async ({ slide, payload }) => {
-    const proc     = Bun.spawn(['python3', scriptPath, payload], { stdout: 'pipe', stderr: 'pipe' })
+    const proc     = Bun.spawn(['python3', scriptPath, payload], { stdout: 'ignore', stderr: 'pipe' })
     const exitCode = await proc.exited
     if (exitCode !== 0) {
       return { ok: false as const, slideNumber: slide.slideNumber, stderr: await new Response(proc.stderr).text() }
@@ -798,7 +807,7 @@ app.post('/api/export-all', async (c) => {
     const pdfPath     = join(slugDir, pdfFilename)
     const pdfPayload  = JSON.stringify(pngPaths)
 
-    const proc = Bun.spawn(['python3', scriptPath, '--pdf', pdfPayload, pdfPath], { stdout: 'pipe', stderr: 'pipe' })
+    const proc = Bun.spawn(['python3', scriptPath, '--pdf', pdfPayload, pdfPath], { stdout: 'ignore', stderr: 'pipe' })
     const exitCode = await proc.exited
     if (exitCode !== 0) {
       const stderr = await new Response(proc.stderr).text()
@@ -835,9 +844,9 @@ app.post('/api/slide-video', async (c) => {
     ...slide, handle: creatorHandle(), transparent: true, output: overlayPath,
   })
   const slideScript = join(import.meta.dir, 'generate_slide.py')
-  const p1 = Bun.spawn(['python3', slideScript, overlayPayload], { stdout: 'pipe', stderr: 'pipe' })
-  if (await p1.exited !== 0) {
-    return c.json({ error: `overlay render failed: ${await new Response(p1.stderr).text()}` }, 500)
+  const overlayProc = Bun.spawn(['python3', slideScript, overlayPayload], { stdout: 'ignore', stderr: 'pipe' })
+  if (await overlayProc.exited !== 0) {
+    return c.json({ error: `overlay render failed: ${await new Response(overlayProc.stderr).text()}` }, 500)
   }
 
   const filename = `slide_${slide.slideNumber ?? 1}.mp4`
@@ -848,12 +857,12 @@ app.post('/api/slide-video', async (c) => {
     audio:   audio ? resolveMediaPath(audio) ?? undefined : undefined,
     duration, zoom, output: outputPath,
   })
-  const p2 = Bun.spawn(['python3', join(import.meta.dir, 'slide_video.py'), payload],
-                       { stdout: 'pipe', stderr: 'pipe' })
-  const code = await p2.exited
+  const videoProc = Bun.spawn(['python3', join(import.meta.dir, 'slide_video.py'), payload],
+                       { stdout: 'ignore', stderr: 'pipe' })
+  const code = await videoProc.exited
   try { unlinkSync(overlayPath) } catch { /* best effort */ }
   if (code !== 0) {
-    return c.json({ error: `slide video failed: ${await new Response(p2.stderr).text()}` }, 500)
+    return c.json({ error: `slide video failed: ${await new Response(videoProc.stderr).text()}` }, 500)
   }
   return c.json({ url: `/carousel-output/${slug}/${filename}`, filename, outputDir: slugDir })
 })
@@ -868,9 +877,10 @@ app.post('/api/flash-video', async (c) => {
   const outputPath = join(OUTPUT_DIR, filename)
   const payload = JSON.stringify({ ...body, output: outputPath, outputDir: OUTPUT_DIR })
   const scriptPath = join(import.meta.dir, 'flash_video.py')
-  const proc = Bun.spawn(['python3', scriptPath, payload], { stdout: 'pipe', stderr: 'pipe' })
-  const exitCode = await proc.exited
-  const stderr = await new Response(proc.stderr).text()
+  const proc = Bun.spawn(['python3', scriptPath, payload], { stdout: 'ignore', stderr: 'pipe' })
+  const [exitCode, stderr] = await Promise.all([
+    proc.exited, new Response(proc.stderr).text(),
+  ])
   if (exitCode !== 0) return c.json({ error: `Flash video failed: ${stderr}` }, 500)
 
   // Save JSON sidecar
@@ -1057,11 +1067,9 @@ app.get('/files/:filename', async (c) => {
   const filePath = resolveMediaPath(`/files/${filename}`)
   if (!filePath) return c.text('Not found', 404)
   const file = Bun.file(filePath)
-  const contentType = filename.endsWith('.pdf') ? 'application/pdf'
-    : filename.endsWith('.mp4') ? 'video/mp4'
-    : filename.endsWith('.webm') ? 'video/webm'
-    : 'image/png'
-  const disposition = filename.endsWith('.pdf') ? `attachment; filename="${filename}"` : 'inline'
+  const contentType = mediaType(filename)
+  const disposition = contentType === 'application/pdf'
+    ? `attachment; filename="${filename}"` : 'inline'
   return new Response(file, {
     headers: { 'Content-Type': contentType, 'Cache-Control': 'no-store', 'Content-Disposition': disposition, 'Accept-Ranges': 'bytes' },
   })
