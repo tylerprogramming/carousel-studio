@@ -23,6 +23,8 @@ interface ExportedCarousel {
   pdf: string | null
   hasCaptions: boolean
   modified: number
+  /** Whole-carousel videos, e.g. the set played as one vertical clip */
+  videos?: { filename: string; url: string }[]
   /** Platform variants keyed by folder name, e.g. { tiktok: {...} } */
   variants?: Record<string, SlideSet>
   /** Variants older than the default set — re-exported without them */
@@ -216,6 +218,11 @@ export default function ExportsGallery({ onClose }: Props) {
                       <span>{timeAgo(c.modified)}</span>
                       {c.pdf && <span className="rounded bg-secondary px-1">PDF</span>}
                       {c.hasCaptions && <span className="rounded bg-secondary px-1">CAP</span>}
+                      {!!c.videos?.length && (
+                        <span className="rounded bg-brand/15 px-1 text-brand" title="Has a full-carousel video">
+                          VID
+                        </span>
+                      )}
                       {Object.keys(c.variants ?? {}).map((key) => (
                         <span
                           key={key}
@@ -310,6 +317,36 @@ export default function ExportsGallery({ onClose }: Props) {
                 <p className="mb-3 rounded-lg border border-border bg-secondary p-2 text-[11px] text-muted-foreground">
                   {buildNote}
                 </p>
+              )}
+
+              {!!open.videos?.length && (
+                <div className="mb-3">
+                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
+                    full-carousel video
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {open.videos.map((v) => (
+                      <div key={v.url} className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setPreview(v.url)}
+                          className={cn(
+                            'flex-1 truncate rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-semibold',
+                            preview === v.url
+                              ? 'border-brand text-brand'
+                              : 'border-border text-muted-foreground hover:border-brand hover:text-brand',
+                          )}
+                          title={v.filename}
+                        >
+                          ▶ {v.filename}
+                        </button>
+                        <a href={v.url} download
+                           className="rounded-lg border border-border px-2 py-1.5 text-[11px] text-muted-foreground hover:border-brand hover:text-brand">
+                          ↓
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {Object.keys(open.variants ?? {}).length > 0 && (

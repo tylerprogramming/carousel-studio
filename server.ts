@@ -1083,6 +1083,13 @@ app.get('/api/exports', (c) => {
       }
 
       const pdf = root.files.find((f) => f.toLowerCase().endsWith('.pdf'))
+      // Carousel-level videos: any mp4 at the root that is not a slide, e.g.
+      // the whole set played as one vertical clip. Without this the file is
+      // written to disk and then invisible to the app that wrote it.
+      const videos = root.files
+        .filter((f) => /\.(mp4|mov|webm)$/i.test(f) && !/^slide_\d+\./i.test(f))
+        .sort()
+        .map((f) => ({ filename: f, url: `${base}/${f}` }))
       // A variant older than the default set means someone re-exported and the
       // variant was left behind. Surfacing it beats silently posting stale art.
       const stale = Object.keys(variants).filter((k) => variants[k].modified < root.modified - 1000)
@@ -1094,6 +1101,7 @@ app.get('/api/exports', (c) => {
         cover: root.cover,
         pdf: pdf ? `${base}/${pdf}` : null,
         hasCaptions: root.files.includes('captions.md'),
+        videos,
         modified: root.modified,
         variants,                       // { tiktok: {...}, … }
         platforms: ['default', ...Object.keys(variants)],
