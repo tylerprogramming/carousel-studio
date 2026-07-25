@@ -249,12 +249,17 @@ def generate_terminal_slide(data):
         return max(8, round(px * scale))
 
     PADX = 84
-    img = Image.new('RGB', (WIDTH, HEIGHT), bg)
+    # `transparent` renders the slide furniture only, on alpha, so ffmpeg can
+    # composite it over moving footage. The photo is skipped: the video is the
+    # background in that mode.
+    transparent = bool(data.get('transparent'))
+    img = (Image.new('RGBA', (WIDTH, HEIGHT), (0, 0, 0, 0)) if transparent
+           else Image.new('RGB', (WIDTH, HEIGHT), bg))
 
     # Optional photo behind the terminal chrome. Cover-cropped like the CSS
     # `object-fit: cover` the preview uses, so framing matches the export.
     bg_path = data.get('backgroundImagePath')
-    has_photo = bool(bg_path and os.path.exists(bg_path))
+    has_photo = bool(bg_path and os.path.exists(bg_path)) and not transparent
     if has_photo:
         try:
             src = Image.open(bg_path).convert('RGB')
@@ -273,8 +278,13 @@ def generate_terminal_slide(data):
         ramp = Image.new('L', (1, fade_h))
         # Squared falloff — a linear ramp reads as a visible band, this does not
         ramp.putdata([int(255 * (i / max(1, fade_h - 1)) ** 2) for i in range(fade_h)])
-        img.paste(Image.new('RGB', (WIDTH, fade_h), bg), (0, HEIGHT - fade_h),
-                  ramp.resize((WIDTH, fade_h)))
+        mask = ramp.resize((WIDTH, fade_h))
+        if transparent:
+            band = Image.new('RGBA', (WIDTH, fade_h), (*bg, 255))
+            band.putalpha(mask)
+            img.alpha_composite(band, (0, HEIGHT - fade_h))
+        else:
+            img.paste(Image.new('RGB', (WIDTH, fade_h), bg), (0, HEIGHT - fade_h), mask)
 
     d = ImageDraw.Draw(img)
 

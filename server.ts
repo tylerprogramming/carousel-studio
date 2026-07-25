@@ -802,6 +802,49 @@ app.post('/api/export-all', async (c) => {
   })
 })
 
+// ── Slide video (a moving carousel slide) ─────────────────────────────────────
+
+// Instagram carousels take video slides next to image slides, so slide 1 can
+// move while the rest stay still. Renders the slide furniture on alpha, then
+// composites it over a still (slow push-in) or a supplied clip. Writes the mp4
+// next to the exported PNGs so the whole post lives in one folder.
+// Not flash-video: that one is 1080x1920 for standalone Reels.
+app.post('/api/slide-video', async (c) => {
+  const { slide, carouselSlug, duration = 5, zoom = 1.08, audio } = await c.req.json()
+  if (!slide) return c.json({ error: 'slide is required' }, 400)
+
+  const slug    = carouselSlug || `carousel_${Date.now()}`
+  const slugDir = join(exportDir(), slug)
+  mkdirSync(slugDir, { recursive: true })
+
+  const overlayPath = join(OUTPUT_DIR, `overlay_${Date.now()}.png`)
+  const overlayPayload = JSON.stringify({
+    ...slide, handle: creatorHandle(), transparent: true, output: overlayPath,
+  })
+  const slideScript = join(import.meta.dir, 'generate_slide.py')
+  const p1 = Bun.spawn(['python3', slideScript, overlayPayload], { stdout: 'pipe', stderr: 'pipe' })
+  if (await p1.exited !== 0) {
+    return c.json({ error: `overlay render failed: ${await new Response(p1.stderr).text()}` }, 500)
+  }
+
+  const filename = `slide_${slide.slideNumber ?? 1}.mp4`
+  const outputPath = join(slugDir, filename)
+  const payload = JSON.stringify({
+    overlay: overlayPath,
+    source:  resolveMediaPath(slide.backgroundVideo) ?? resolveMediaPath(slide.backgroundImage) ?? undefined,
+    audio:   audio ? resolveMediaPath(audio) ?? undefined : undefined,
+    duration, zoom, output: outputPath,
+  })
+  const p2 = Bun.spawn(['python3', join(import.meta.dir, 'slide_video.py'), payload],
+                       { stdout: 'pipe', stderr: 'pipe' })
+  const code = await p2.exited
+  try { unlinkSync(overlayPath) } catch { /* best effort */ }
+  if (code !== 0) {
+    return c.json({ error: `slide video failed: ${await new Response(p2.stderr).text()}` }, 500)
+  }
+  return c.json({ url: `/carousel-output/${slug}/${filename}`, filename, outputDir: slugDir })
+})
+
 // ── Flash video generation ────────────────────────────────────────────────────
 
 app.post('/api/flash-video', async (c) => {
