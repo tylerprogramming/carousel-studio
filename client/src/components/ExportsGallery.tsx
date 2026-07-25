@@ -82,6 +82,29 @@ export default function ExportsGallery({ onClose }: Props) {
   const [buildNote, setBuildNote] = useState<string | null>(null)
   useEffect(() => { setPlatform('default'); setPreview(null); setBuildNote(null) }, [open?.slug])
 
+  async function buildCarouselVideo(slug: string, duration: number) {
+    setBuilding(true); setBuildNote(null)
+    try {
+      const res = await fetch('/api/carousel-video', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carouselSlug: slug, duration, fade: 0.2 }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      setBuildNote(
+        data.tooFast
+          ? `Built ${data.slideCount} slides in ${data.duration}s. That is under a second each, too fast to read body copy — try a longer one.`
+          : `Built ${data.slideCount} slides in ${data.duration}s.`,
+      )
+      await load(slug)
+      setPreview(data.url)
+    } catch (err) {
+      setBuildNote(String(err instanceof Error ? err.message : err))
+    } finally {
+      setBuilding(false)
+    }
+  }
+
   async function buildTikTok(slug: string) {
     setBuilding(true); setBuildNote(null)
     try {
@@ -261,15 +284,28 @@ export default function ExportsGallery({ onClose }: Props) {
                 </div>
               )}
 
-              {!open.variants?.tiktok && (
-                <button
-                  onClick={() => buildTikTok(open.slug)}
-                  disabled={building}
-                  className="mb-3 w-full rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand disabled:opacity-50"
-                >
-                  {building ? 'Building TikTok set…' : 'Build TikTok set'}
-                </button>
-              )}
+              <div className="mb-3 flex flex-wrap gap-1.5">
+                {!open.variants?.tiktok && (
+                  <button
+                    onClick={() => buildTikTok(open.slug)}
+                    disabled={building}
+                    className="flex-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand disabled:opacity-50"
+                  >
+                    {building ? 'Working…' : 'Build TikTok set'}
+                  </button>
+                )}
+                {[5, 9].map((secs) => (
+                  <button
+                    key={secs}
+                    onClick={() => buildCarouselVideo(open.slug, secs)}
+                    disabled={building}
+                    title={`Play every slide as one ${secs}s vertical video`}
+                    className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand disabled:opacity-50"
+                  >
+                    {building ? '…' : `${secs}s video`}
+                  </button>
+                ))}
+              </div>
               {buildNote && (
                 <p className="mb-3 rounded-lg border border-border bg-secondary p-2 text-[11px] text-muted-foreground">
                   {buildNote}

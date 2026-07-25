@@ -873,6 +873,51 @@ app.post('/api/export-tiktok', async (c) => {
   })
 })
 
+// Play a whole carousel as one short vertical video. A photo carousel and a
+// video are different formats on TikTok with different reach, and this is the
+// video one: the slides you already have, held a beat each, at 1080x1920.
+// Prefers the tiktok/ reframed set so nothing sits under TikTok's UI.
+app.post('/api/carousel-video', async (c) => {
+  const { carouselSlug, duration = 5, fade = 0, audio, coverBoost } = await c.req.json()
+  if (!carouselSlug) return c.json({ error: 'carouselSlug is required' }, 400)
+
+  const slugDir = join(exportDir(), carouselSlug)
+  if (!existsSync(slugDir)) return c.json({ error: `No export at ${carouselSlug}` }, 404)
+
+  // The reframed set already clears TikTok's overlays; fall back to the 4:5
+  // slides, which slides_to_video will letterbox rather than crop.
+  const tiktokDir = join(slugDir, 'tiktok')
+  const sourceDir = existsSync(tiktokDir) ? tiktokDir : slugDir
+  const inputs = readdirSync(sourceDir)
+    .filter((f) => /^slide_\d+\.png$/i.test(f))
+    .sort((a, b) => parseInt(a.match(/\d+/)![0]) - parseInt(b.match(/\d+/)![0]))
+    .map((f) => join(sourceDir, f))
+  if (!inputs.length) return c.json({ error: 'No slide PNGs found' }, 400)
+
+  const filename = `${carouselSlug}-tiktok.mp4`
+  const outputPath = join(slugDir, filename)
+  const payload = JSON.stringify({
+    inputs, output: outputPath, duration, fade,
+    ...(coverBoost != null ? { coverBoost } : {}),
+    ...(audio ? { audio: resolveMediaPath(audio) ?? undefined } : {}),
+  })
+  const proc = Bun.spawn(['python3', join(import.meta.dir, 'slides_to_video.py'), payload],
+                         { stdout: 'ignore', stderr: 'pipe' })
+  const [code, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
+  if (code !== 0) return c.json({ error: `carousel video failed: ${stderr}` }, 500)
+
+  const perSlide = duration / inputs.length
+  return c.json({
+    ok: true,
+    url: `/carousel-output/${encodeURIComponent(carouselSlug)}/${filename}`,
+    filename, slideCount: inputs.length, duration,
+    usedReframed: sourceDir === tiktokDir,
+    // Under a second a slide is not long enough to read body copy. Say so
+    // rather than shipping something unreadable and calling it done.
+    tooFast: perSlide < 0.9,
+  })
+})
+
 // ── Slide video (a moving carousel slide) ─────────────────────────────────────
 
 // Instagram carousels take video slides next to image slides, so slide 1 can
