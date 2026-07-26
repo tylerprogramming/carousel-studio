@@ -49,10 +49,24 @@ export interface Slide {
   insetPanY?: number        // vertical pan: -100 (up) to +100 (down), default 0
 }
 
+/** Written copy that ships with the carousel, per platform. */
+export interface CarouselCaptions {
+  instagram?: string
+  linkedin?: string
+  tiktok?: string
+  hashtags?: string[]
+  /** Gate keyword this carousel asks for, e.g. "EDITOR". Empty means ungated. */
+  gate?: string
+  updatedAt?: string
+}
+
 export interface CarouselConfig {
   title: string
   platform: 'instagram' | 'linkedin' | 'tiktok'
   slides: Slide[]
+  /** Written copy travels with the carousel rather than only existing as a
+   *  captions.md that appears after export. */
+  captions?: CarouselCaptions
 }
 
 export const BG_COLORS = [

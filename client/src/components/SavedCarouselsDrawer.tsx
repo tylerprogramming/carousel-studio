@@ -12,6 +12,10 @@ interface CarouselMeta {
   exported?: string[]
   /** A whole-carousel video has been rendered */
   hasVideo?: boolean
+  /** Nothing is missing before this could be posted */
+  ready?: boolean
+  /** What is missing, e.g. ["no caption"] */
+  blockers?: string[]
 }
 
 /** Short label for an exported set. 'default' is the 4:5 Instagram export. */
@@ -148,8 +152,19 @@ export default function SavedCarouselsDrawer({ onClose, onLoad, onNew, currentId
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: TEXT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: 3 }}>
-                    {c.title || 'Untitled'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                    {/* One dot for "could this be posted", so you do not have to
+                        check the Library, the Exports gallery and the disk. */}
+                    <span
+                      title={c.ready ? 'Ready to post' : `Not ready: ${(c.blockers || []).join(', ')}`}
+                      style={{
+                        width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                        background: c.ready ? '#22A06B' : BORDER,
+                      }}
+                    />
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: TEXT, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {c.title || 'Untitled'}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 10 }}>{platformIcon(c.platform)}</span>
@@ -163,6 +178,11 @@ export default function SavedCarouselsDrawer({ onClose, onLoad, onNew, currentId
                         {EXPORT_LABEL[key] ?? key}
                       </span>
                     ))}
+                    {!c.ready && !!(c.blockers || []).length && (
+                      <span style={{ fontSize: 9.5, background: '#FDF0E7', color: '#B4432B', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>
+                        {c.blockers![0]}
+                      </span>
+                    )}
                     {c.hasVideo && (
                       <span title="A full-carousel video has been rendered"
                             style={{ fontSize: 9.5, background: '#FEE9E3', color: CORAL, borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>

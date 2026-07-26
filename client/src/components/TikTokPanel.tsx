@@ -5,9 +5,7 @@ import SlidePreview from './SlidePreview'
 import { BLUE, BORDER, BG, MUTED, TEXT as TEXT_C, TIKTOK, TIKTOK_D, TIKTOK_SAFE, WHITE } from '../lib/tokens'
 import { useSettings } from '../hooks/useSettings'
 
-type FlashStyle = 'statement' | 'video' | 'terminal'
 
-interface TtText { headline: string; emphasisLine: string; bodyText: string }
 
 interface Props {
   slides: Slide[]
@@ -92,68 +90,16 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
   useEffect(() => { loadExported() }, [loadExported])
 
   // TT-specific text — separate from carousel, initialized from slide
-  const [ttText, setTtText] = useState<TtText>({
-    headline:    slide?.headline    ?? '',
-    emphasisLine: slide?.emphasisLine ?? '',
-    bodyText:    slide?.bodyText    ?? '',
-  })
-  const [style, setStyle]       = useState<FlashStyle>(slide?.backgroundVideo ? 'video' : 'statement')
-  const [duration, setDuration] = useState(5)
   const [generating, setGenerating] = useState(false)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [error, setError]       = useState<string | null>(null)
   const prevIndexRef            = useRef(activeIndex)
 
-  // Reset TT text when slide changes
-  useEffect(() => {
-    if (prevIndexRef.current === activeIndex) return
-    prevIndexRef.current = activeIndex
-    setTtText({
-      headline:    slide?.headline    ?? '',
-      emphasisLine: slide?.emphasisLine ?? '',
-      bodyText:    slide?.bodyText    ?? '',
-    })
-    setStyle(slide?.backgroundVideo ? 'video' : 'statement')
-    setVideoUrl(null)
-    setError(null)
-  }, [activeIndex, slide])
 
-  // Build a preview slide using TT-specific text (doesn't touch carousel data)
-  const previewSlide: Slide | undefined = slide ? {
-    ...slide,
-    headline:    ttText.headline,
-    emphasisLine: ttText.emphasisLine,
-    bodyText:    ttText.bodyText,
-  } : undefined
+  // The panel previews the real slide now. It used to preview a separate text
+  // draft that only fed the removed single-slide Flash Video export.
+  const previewSlide: Slide | undefined = slide
 
-  const generateMp4 = useCallback(async () => {
-    if (!slide) return
-    setGenerating(true)
-    setError(null)
-    try {
-      const resp = await fetch('/api/flash-video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          carouselId,
-          slideNumber: slide.slideNumber,
-          style, duration,
-          headline:    ttText.headline,
-          emphasisLine: ttText.emphasisLine,
-          bgColor: slide.bgColor,
-          textColor: slide.textColor,
-          accentColor: slide.accentColor,
-          backgroundVideo: slide.backgroundVideo,
-          backgroundImage: slide.backgroundImage,
-          overlayOpacity: slide.overlayOpacity,
-        }),
-      })
-      const data = await resp.json()
-      if (!resp.ok || data.error) setError(data.error || 'Generation failed')
-      else setVideoUrl(data.url + '?t=' + Date.now())
-    } catch (err) { setError(String(err)) }
-    finally { setGenerating(false) }
-  }, [slide, style, duration, ttText, carouselId])
 
   // Phone: fill available space, 9:16 ratio
   // Size the phone from the window, the way the Instagram preview fills its
@@ -249,117 +195,6 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 18 }}>
           {exportedBlock}
 
-          {/* Style */}
-          <div>
-            <div style={labelStyle}>Style</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {(['statement', 'video', 'terminal'] as FlashStyle[]).map((s) => {
-                const disabled = s === 'video' && !slide?.backgroundVideo
-                const active   = style === s
-                return (
-                  <button key={s} onClick={() => !disabled && setStyle(s)} disabled={disabled}
-                    style={{
-                      flex: 1, padding: '8px 4px', borderRadius: 8, fontSize: 11, fontWeight: 700,
-                      border: `1.5px solid ${active ? TIKTOK : BORDER}`,
-                      background: active ? '#fff0f3' : BG,
-                      color: disabled ? '#ccc' : active ? TIKTOK : TEXT_C,
-                      cursor: disabled ? 'not-allowed' : 'pointer',
-                      opacity: disabled ? 0.4 : 1, transition: 'all 0.15s',
-                    }}>
-                    {s === 'statement' ? '📝 Text' : s === 'video' ? '🎬 Video' : '💻 Term'}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Duration */}
-          <div>
-            <div style={labelStyle}>Duration</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {[4, 5, 7].map((d) => (
-                <button key={d} onClick={() => setDuration(d)}
-                  style={{
-                    flex: 1, padding: '8px 4px', borderRadius: 8, fontSize: 11, fontWeight: 700,
-                    border: `1.5px solid ${duration === d ? BLUE : BORDER}`,
-                    background: duration === d ? '#eef0fd' : BG,
-                    color: duration === d ? BLUE : TEXT_C,
-                    cursor: 'pointer', transition: 'all 0.15s',
-                  }}>
-                  {d}s
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* TT-specific text — does NOT update the carousel */}
-          <div>
-            <div style={labelStyle}>Headline</div>
-            <textarea rows={2} value={ttText.headline}
-              onChange={(e) => setTtText((t) => ({ ...t, headline: e.target.value }))}
-              style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = TIKTOK }}
-              onBlur={(e)  => { e.currentTarget.style.borderColor = BORDER }}
-            />
-          </div>
-
-          <div>
-            <div style={labelStyle}>Emphasis Line</div>
-            <textarea rows={2} value={ttText.emphasisLine}
-              onChange={(e) => setTtText((t) => ({ ...t, emphasisLine: e.target.value }))}
-              style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = TIKTOK }}
-              onBlur={(e)  => { e.currentTarget.style.borderColor = BORDER }}
-            />
-          </div>
-
-          <div>
-            <div style={labelStyle}>Body Text</div>
-            <textarea rows={3} value={ttText.bodyText}
-              onChange={(e) => setTtText((t) => ({ ...t, bodyText: e.target.value }))}
-              style={inputStyle}
-              onFocus={(e) => { e.currentTarget.style.borderColor = TIKTOK }}
-              onBlur={(e)  => { e.currentTarget.style.borderColor = BORDER }}
-            />
-          </div>
-
-          {/* Generate */}
-          <button onClick={generateMp4} disabled={generating}
-            style={{
-              padding: '12px 0', background: generating ? MUTED : TIKTOK, border: 'none',
-              borderRadius: 10, color: WHITE, fontSize: 13, fontWeight: 800,
-              cursor: generating ? 'default' : 'pointer',
-              boxShadow: generating ? 'none' : '0 3px 14px rgba(254,44,85,0.38)',
-              transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-            onMouseEnter={(e) => { if (!generating) e.currentTarget.style.background = TIKTOK_D }}
-            onMouseLeave={(e) => { if (!generating) e.currentTarget.style.background = generating ? MUTED : TIKTOK }}
-          >
-            {generating
-              ? <><span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: WHITE, borderRadius: '50%', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} /> Generating…</>
-              : <><TikTokIcon size={14} /> Generate MP4</>
-            }
-          </button>
-
-          {videoUrl && (
-            <a href={videoUrl} download style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              padding: '10px 0', borderRadius: 9, border: `1.5px solid ${TIKTOK}`,
-              color: TIKTOK, fontSize: 12, fontWeight: 700, textDecoration: 'none',
-              background: '#fff0f3', transition: 'all 0.15s',
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = TIKTOK; e.currentTarget.style.color = WHITE }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#fff0f3'; e.currentTarget.style.color = TIKTOK }}
-            >
-              ⬇ Download MP4
-            </a>
-          )}
-
-          {error && (
-            <div style={{ padding: '9px 11px', background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 8, color: '#dc2626', fontSize: 11 }}>
-              {error}
-            </div>
-          )}
         </div>
       </div>
 
@@ -433,7 +268,7 @@ export default function TikTokPanel({ slides, activeIndex, carouselId, carouselT
               <div style={{ position: 'absolute', bottom: Math.round(PHONE_H * 0.022), left: Math.round(PHONE_W * 0.028), right: Math.round(PHONE_W * 0.14) }}>
                 <div style={{ color: WHITE, fontSize: 12, fontWeight: 700, textShadow: '0 1px 4px rgba(0,0,0,0.9)', marginBottom: 2 }}>{handle}</div>
                 <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 10, textShadow: '0 1px 3px rgba(0,0,0,0.9)', lineHeight: 1.4, marginBottom: 4 }}>
-                  {ttText.headline.slice(0, 55)}
+                  {(slide?.headline || '').slice(0, 55)}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span style={{ fontSize: 10 }}>🎵</span>

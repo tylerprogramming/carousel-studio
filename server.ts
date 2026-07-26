@@ -207,10 +207,24 @@ app.get('/api/carousels', (c) => {
             hasVideo = files.some((x) => x.isFile() && /\.(mp4|mov|webm)$/i.test(x.name) && !/^slide_\d+\./i.test(x.name))
           } catch { /* ignore */ }
         }
+        // Everything needed to answer "can this be posted yet", in one place.
+        // It used to take the Library, the Exports gallery and the filesystem.
+        const caps = d.captions || {}
+        const readiness = {
+          hasCaption: !!(caps.instagram || caps.linkedin || caps.tiktok),
+          hasGate: !!caps.gate,
+          hasExport: exported.includes('default'),
+          hasTikTok: exported.some((k: string) => k !== 'default'),
+          hasVideo,
+        }
+        const blockers: string[] = []
+        if (!readiness.hasCaption) blockers.push('no caption')
+        if (!readiness.hasExport) blockers.push('not exported')
         return {
           id: d.id, title: d.title, platform: d.platform,
           slideCount: d.slides?.length ?? 0, savedAt: d.savedAt,
-          slug, exported, hasVideo,
+          slug, exported, hasVideo, readiness, blockers,
+          ready: blockers.length === 0,
         }
       } catch { return null }
     })
