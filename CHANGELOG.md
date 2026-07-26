@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.1.3
+
+**Check findings appear on the slides.** The pre-export check finds real
+defects — it caught a headline clipped to "/embedded-captio" that had already
+been exported and scheduled. But findings only arrived as JSON attached to an
+export result, and a line saying "slide 3" is not read the way a mark on slide
+3 is.
+
+The check now runs 800ms after edits settle. Affected thumbnails carry a dot,
+red for error and amber for warning. The selected slide's findings sit above
+the Inspector tabs, errors first, because the fix lands in a different tab
+depending on the finding. A header badge gives the count and jumps to the
+first affected slide, and stays quiet when clean. Export is never blocked.
+
+Fixes a real bug found on the way: slides written server-side by Generate and
+Batch were stored with no id, so 9 of 11 saved carousels had `id: null` on
+every slide. React was keying every thumbnail as `undefined`, which made
+drag-reorder unreliable and would have put every finding on every slide. Ids
+are now backfilled on load.
+
 ## 2.1.2
 
 **Readiness rail in the editor.** Whether a carousel could be posted took three
