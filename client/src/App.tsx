@@ -9,13 +9,12 @@ import SlideList from './components/SlideList'
 import Inspector from './components/Inspector'
 import SlideEditor from './components/SlideEditor'
 import SlidePreview from './components/SlidePreview'
-import InstagramPreview from './components/InstagramPreview'
+import PlatformPreview from './components/PlatformPreview'
 import GenerateModal from './components/GenerateModal'
 import SavedCarouselsDrawer from './components/SavedCarouselsDrawer'
 import BatchModal from './components/BatchModal'
 import ExportsGallery from './components/ExportsGallery'
 import JobStrip from './components/JobStrip'
-import TikTokPanel from './components/TikTokPanel'
 import ReadinessRail from './components/ReadinessRail'
 import CheckBadge from './components/CheckBadge'
 import {
@@ -70,6 +69,9 @@ export default function App() {
   // Bumped when an export finishes, which is the only moment the readiness rail
   // needs to look at the disk again.
   const [readinessKey, setReadinessKey] = useState(0)
+  // An export the Exports panel handed to the phone frame in the canvas. Held
+  // here because the two live in different columns.
+  const [playingExport, setPlayingExport] = useState<string | null>(null)
 
   // On mount, reload the last-used carousel rather than starting blank
   const isLoaded = useRef(false)
@@ -555,61 +557,58 @@ export default function App() {
       <JobStrip jobs={running} onCancel={cancelJob} />
       {exportToast}
 
+      {/* One row, every platform. Picking TikTok used to swap this whole thing
+          for a bespoke panel, which took the Inspector and the readiness rail
+          off screen with it — you could not write a caption on a TikTok
+          carousel. The platform now changes what the canvas draws and nothing
+          else. */}
       {!isMobile && (
         <div className="flex flex-1 overflow-hidden">
-          {config.platform === 'tiktok' ? (
-            <>
-              <SlideList
-                slides={config.slides} activeIndex={activeIndex} onSelect={handleSelect}
-                onAdd={addSlide} onRemove={removeSlide} onReorder={reorder} onDuplicate={duplicateSlide}
-                findingsFor={check.findingsFor}
+          <SlideList
+            slides={config.slides} activeIndex={activeIndex} onSelect={handleSelect}
+            onAdd={addSlide} onRemove={removeSlide} onReorder={reorder} onDuplicate={duplicateSlide}
+            findingsFor={check.findingsFor}
+          />
+          <div className="flex min-w-[320px] flex-1 flex-col overflow-hidden bg-background">
+            {controlsPanel}
+            <div className="flex-1 overflow-hidden">
+              <PlatformPreview
+                slides={config.slides} activeIndex={previewIndex} platform={config.platform}
+                onIndexChange={(i) => { setPreviewIndex(i); setActiveIndex(i) }}
+                playingUrl={playingExport} onStopPlaying={() => setPlayingExport(null)}
               />
-              <TikTokPanel slides={config.slides} activeIndex={activeIndex} carouselId={carouselId} carouselTitle={config.title} />
-              {showExports && <ExportsGallery docked onClose={() => setShowExports(false)} />}
-            </>
-          ) : (
-            <>
-              <SlideList
-                slides={config.slides} activeIndex={activeIndex} onSelect={handleSelect}
-                onAdd={addSlide} onRemove={removeSlide} onReorder={reorder} onDuplicate={duplicateSlide}
-                findingsFor={check.findingsFor}
-              />
-              <div className="flex min-w-[320px] flex-1 flex-col overflow-hidden bg-background">
-                {controlsPanel}
-                <div className="flex-1 overflow-hidden">
-                  <InstagramPreview
-                    slides={config.slides} activeIndex={previewIndex} platform={config.platform}
-                    onIndexChange={(i) => { setPreviewIndex(i); setActiveIndex(i) }}
-                  />
-                </div>
-              </div>
-              {/* Exports takes the Inspector's slot rather than adding a fourth
-                  column: 184 + 320 canvas + 360 + 360 is 1224px of hard
-                  minimum, so beside the Inspector the canvas would sit at its
-                  floor on any 1200px window. Same slot also means one toggle
-                  swaps between "change this slide" and "check what shipped",
-                  and the canvas and selection survive the swap. */}
-              {showExports ? (
-                <ExportsGallery docked onClose={() => setShowExports(false)} />
-              ) : activeSlide && (
-                <Inspector
-                  slide={activeSlide} allSlides={config.slides} onChange={updateSlide}
-                  onSlideChange={updateSlide}
-                  captions={config.captions ?? {}} onCaptionsChange={updateCaptions}
-                  carouselTitle={config.title} platform={config.platform} slug={slugify(config.title)}
-                  startJob={startJob} runningJobs={running}
-                  findings={check.findingsFor(activeSlide)}
-                />
-              )}
-            </>
+            </div>
+          </div>
+          {/* Exports takes the Inspector's slot rather than adding a fourth
+              column: 184 + 320 canvas + 360 + 360 is 1224px of hard
+              minimum, so beside the Inspector the canvas would sit at its
+              floor on any 1200px window. Same slot also means one toggle
+              swaps between "change this slide" and "check what shipped",
+              and the canvas and selection survive the swap. */}
+          {showExports ? (
+            <ExportsGallery
+              docked
+              currentSlug={slugify(config.title)}
+              onPlay={setPlayingExport}
+              playingUrl={playingExport}
+              onClose={() => { setShowExports(false); setPlayingExport(null) }}
+            />
+          ) : activeSlide && (
+            <Inspector
+              slide={activeSlide} allSlides={config.slides} onChange={updateSlide}
+              onSlideChange={updateSlide}
+              captions={config.captions ?? {}} onCaptionsChange={updateCaptions}
+              carouselTitle={config.title} platform={config.platform} slug={slugify(config.title)}
+              startJob={startJob} runningJobs={running}
+              findings={check.findingsFor(activeSlide)}
+            />
           )}
         </div>
       )}
 
       {/* Under the editor, not inside it: the question is about the carousel,
-          not the slide you happen to have selected. The TikTok panel is being
-          restructured separately and is left alone. */}
-      {!isMobile && config.platform !== 'tiktok' && (
+          not the slide you happen to have selected. */}
+      {!isMobile && (
         <ReadinessRail
           carouselId={carouselId}
           slug={slugify(config.title)}
@@ -735,7 +734,7 @@ export default function App() {
                 {controlsPanel}
                 <div className="flex flex-1 justify-center overflow-auto pt-2">
                   <div className="origin-top" style={{ zoom: 0.78 }}>
-                    <InstagramPreview
+                    <PlatformPreview
                       slides={config.slides} activeIndex={previewIndex} platform={config.platform}
                       onIndexChange={(i) => { setPreviewIndex(i); setActiveIndex(i) }}
                     />

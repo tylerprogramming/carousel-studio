@@ -1,14 +1,32 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Slide } from '../types'
 import SlidePreview from './SlidePreview'
 import { useSettings } from '../hooks/useSettings'
+import { cn } from '../lib/utils'
 import { TIKTOK_SAFE } from '../lib/tokens'
+
+/**
+ * The one phone preview, for every platform.
+ *
+ * There used to be two TikTok phones: this one, and a second one inside
+ * TikTokPanel, which replaced the whole editor when TikTok was selected. On
+ * desktop only the panel's ever rendered, so a safe-area fix landed here and
+ * looked like it did nothing — this one was reachable only under 1200px, where
+ * the panel was not used. There is one phone now, and the platform switcher
+ * changes what it draws and nothing else about the editor.
+ */
 
 interface Props {
   slides: Slide[]
   activeIndex: number
   onIndexChange: (i: number) => void
   platform?: 'instagram' | 'linkedin' | 'tiktok'
+  /**
+   * A finished export to play in the phone instead of the live mockup. Set by
+   * the Exports panel, which is docked in the column beside this one.
+   */
+  playingUrl?: string | null
+  onStopPlaying?: () => void
 }
 
 const PHONE_W     = 390
@@ -237,7 +255,7 @@ function LinkedInPhone({ slides, activeIndex, onIndexChange }: Omit<Props, 'plat
 }
 
 // ── TikTok preview ─────────────────────────────────────────────────────────────
-function TikTokPhone({ slides, activeIndex, onIndexChange }: Omit<Props, 'platform'>) {
+function TikTokPhone({ slides, activeIndex, onIndexChange, showSafeArea }: Omit<Props, 'platform'> & { showSafeArea: boolean }) {
   const { handle } = useSettings()
   const dragRef = useRef<{ startX: number; dragging: boolean }>({ startX: 0, dragging: false })
   function onMouseDown(e: React.MouseEvent) { dragRef.current = { startX: e.clientX, dragging: true } }
@@ -262,9 +280,10 @@ function TikTokPhone({ slides, activeIndex, onIndexChange }: Omit<Props, 'platfo
           const contentH = Math.round(contentW * 1350 / 1080)
           const top      = Math.round((TT_VIDEO_H - contentH) * TT_TOP_BIAS)
           const pad      = slides[activeIndex]?.bgColor || '#12141A'
+          const left     = Math.round(PHONE_W * TT_MARGIN)
           return (
             <div style={{ position: 'absolute', inset: 0, background: pad }}>
-              <div style={{ position: 'absolute', top, left: Math.round(PHONE_W * TT_MARGIN) }}>
+              <div style={{ position: 'absolute', top, left }}>
                 <CarouselStrip
                   slides={slides}
                   activeIndex={activeIndex}
@@ -274,6 +293,19 @@ function TikTokPhone({ slides, activeIndex, onIndexChange }: Omit<Props, 'platfo
                   height={contentH}
                 />
               </div>
+              {/* The padding around the inset is the slide's own background
+                  colour, so the inset is invisible on most slides. This outlines
+                  where the 4:5 art actually stops. */}
+              {showSafeArea && (
+                <div style={{
+                  position: 'absolute', top, left, width: contentW, height: contentH,
+                  border: '1px dashed #fff', pointerEvents: 'none', zIndex: 15,
+                  // Difference blend rather than a fixed colour: slide
+                  // backgrounds run from cream to near-black, and a white
+                  // hairline vanished on every light one.
+                  mixBlendMode: 'difference',
+                }} />
+              )}
             </div>
           )
         })()}
@@ -371,8 +403,36 @@ function ActionBtn({ icon, label }: { icon: React.ReactNode; label: string }) {
   )
 }
 
+// ── Exported-clip player ───────────────────────────────────────────────────────
+/**
+ * A finished export playing in the phone. There is no feed chrome around it:
+ * the file already has whatever framing it was built with, and mocking a feed
+ * on top of it would only hide the thing being checked.
+ */
+function ExportPlayer({ url }: { url: string }) {
+  return (
+    <PhoneShell bg="#000">
+      <div style={{ width: PHONE_W, height: TT_VIDEO_H, background: '#000' }}>
+        <video
+          key={url}
+          src={url}
+          controls autoPlay loop playsInline
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+        />
+      </div>
+    </PhoneShell>
+  )
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
-export default function PlatformPreview({ slides, activeIndex, onIndexChange, platform = 'instagram' }: Props) {
+export default function PlatformPreview({
+  slides, activeIndex, onIndexChange, platform = 'instagram',
+  playingUrl = null, onStopPlaying,
+}: Props) {
+  // On by default: the inset is the single thing about the TikTok framing that
+  // is easy to get wrong and impossible to see.
+  const [showSafeArea, setShowSafeArea] = useState(true)
+
   if (!slides[activeIndex]) return null
 
   const bgColor = platform === 'instagram' ? '#FFF3F0'   // warm Instagram coral tint
@@ -406,22 +466,49 @@ export default function PlatformPreview({ slides, activeIndex, onIndexChange, pl
       justifyContent: 'flex-start', overflowY: 'auto', padding: '20px 0',
       background: bgColor,
     }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 16 }}>
-        {label}
+      <div className="mb-4 flex items-center gap-2.5">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+          {playingUrl ? 'Playing export' : label}
+        </span>
+        {playingUrl ? (
+          <button
+            onClick={onStopPlaying}
+            className="text-[10px] font-bold text-brand hover:underline"
+          >
+            back to preview
+          </button>
+        ) : platform === 'tiktok' ? (
+          <button
+            onClick={() => setShowSafeArea((v) => !v)}
+            title="The slide is inset to clear TikTok's caption and action rail. The padding is the slide's own colour, so this outlines it."
+            className={cn(
+              'text-[10px] font-bold hover:underline',
+              showSafeArea ? 'text-tiktok' : 'text-muted-foreground',
+            )}
+          >
+            safe area
+          </button>
+        ) : null}
       </div>
 
       {/* Phone wrapped in relative div so arrows can overlay the sides */}
       <div style={{ position: 'relative', flexShrink: 0 }}>
-        {platform === 'instagram' && <InstagramPhone slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} />}
-        {platform === 'linkedin'  && <LinkedInPhone  slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} />}
-        {platform === 'tiktok'    && <TikTokPhone    slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} />}
+        {playingUrl ? (
+          <ExportPlayer url={playingUrl} />
+        ) : (
+          <>
+            {platform === 'instagram' && <InstagramPhone slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} />}
+            {platform === 'linkedin'  && <LinkedInPhone  slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} />}
+            {platform === 'tiktok'    && <TikTokPhone    slides={slides} activeIndex={activeIndex} onIndexChange={onIndexChange} showSafeArea={showSafeArea} />}
 
-        {activeIndex > 0               && arrowBtn(prev, '←', 'left')}
-        {activeIndex < slides.length-1 && arrowBtn(next, '→', 'right')}
+            {activeIndex > 0               && arrowBtn(prev, '←', 'left')}
+            {activeIndex < slides.length-1 && arrowBtn(next, '→', 'right')}
+          </>
+        )}
       </div>
 
       <div style={{ marginTop: 12, fontSize: 12, color: '#a1a1aa', fontWeight: 600 }}>
-        {activeIndex + 1} of {slides.length}
+        {playingUrl ? playingUrl.split('/').pop() : `${activeIndex + 1} of ${slides.length}`}
       </div>
     </div>
   )

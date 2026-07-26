@@ -84,7 +84,7 @@ export default function ReadinessRail({ carouselId, slug, captions, refreshKey =
       ok: exported.some((k) => k !== 'default'),
       blocking: false,
       blocker: 'no tiktok set',
-      hint: 'No TikTok set. Switch the platform to TT in the header and export from the TikTok panel. Optional.',
+      hint: 'No TikTok set. Open Exports in the header and hit Build TikTok set. Optional.',
       done: 'TikTok set exported.',
     },
   ]

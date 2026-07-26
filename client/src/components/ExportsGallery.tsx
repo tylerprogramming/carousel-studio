@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '../lib/utils'
 
 /**
@@ -18,6 +18,13 @@ import { cn } from '../lib/utils'
  * It stays a viewer either way. Picking an export does not load it into the
  * editor — the thing on disk is finished, and the editable original is one
  * click away in the Library.
+ *
+ * This is also where the old TikTok panel's "Exported for TikTok" block ended
+ * up: the reframed 9:16 thumbnails, the carousel videos and the stale-variant
+ * warning already existed here, for every platform, so keeping a second copy
+ * bolted to one platform's editor was the only reason that panel survived.
+ * Docked it opens on the carousel you are editing, so it answers the same
+ * question in the same click, and videos play in the phone frame next door.
  */
 
 interface SlideSet {
@@ -53,6 +60,12 @@ interface Props {
   onClose: () => void
   /** Render as a column in the editor row instead of an overlay. */
   docked?: boolean
+  /** Export folder of the carousel being edited, opened on first render. */
+  currentSlug?: string
+  /** Hand a video to the phone frame in the canvas instead of playing it here. */
+  onPlay?: (url: string) => void
+  /** What the phone is currently playing, so the tile can show as selected. */
+  playingUrl?: string | null
 }
 
 function timeAgo(ms: number) {
@@ -65,11 +78,13 @@ function timeAgo(ms: number) {
   return days < 30 ? `${days}d ago` : new Date(ms).toLocaleDateString()
 }
 
+const isVideo = (src: string) => /\.(mp4|mov|webm)$/i.test(src)
+
 /** A slide is a PNG or, for a moving cover, an MP4. Pick the right element. */
 function SlideMedia({ src, className, alt, controls }: {
   src: string; className?: string; alt: string; controls?: boolean
 }) {
-  if (/\.(mp4|mov|webm)$/i.test(src)) {
+  if (isVideo(src)) {
     return (
       <video
         src={src}
@@ -88,7 +103,9 @@ function SlideMedia({ src, className, alt, controls }: {
   return <img src={src} alt={alt} loading="lazy" className={className} />
 }
 
-export default function ExportsGallery({ onClose, docked = false }: Props) {
+export default function ExportsGallery({
+  onClose, docked = false, currentSlug, onPlay, playingUrl = null,
+}: Props) {
   const [items, setItems] = useState<ExportedCarousel[]>([])
   const [dir, setDir] = useState('')
   const [loading, setLoading] = useState(true)
@@ -99,6 +116,26 @@ export default function ExportsGallery({ onClose, docked = false }: Props) {
   const [building, setBuilding] = useState(false)
   const [buildNote, setBuildNote] = useState<string | null>(null)
   useEffect(() => { setPlatform('default'); setPreview(null); setBuildNote(null) }, [open?.slug])
+
+  // Docked, a 9:16 clip in a 360px column is a postage stamp, and the phone
+  // frame one column over is already the right shape and already on screen.
+  // The overlay has nothing behind it, so it keeps its own player.
+  function openMedia(url: string) {
+    if (onPlay && isVideo(url)) { onPlay(url); return }
+    setPreview(url)
+  }
+  const selectedMedia = onPlay ? (playingUrl ?? preview) : preview
+
+  // Open on the carousel being edited rather than making you find it in a grid
+  // of nine. Once per mount — hitting "All exports" has to stick, and the slug
+  // changes on every keystroke in the title field.
+  const autoOpened = useRef(false)
+  useEffect(() => {
+    if (!docked || autoOpened.current || !items.length) return
+    autoOpened.current = true
+    const match = items.find((c) => c.slug === currentSlug)
+    if (match) setOpen(match)
+  }, [docked, currentSlug, items])
 
   async function buildCarouselVideo(slug: string, perSlide: number) {
     setBuilding(true); setBuildNote(null)
@@ -115,7 +152,7 @@ export default function ExportsGallery({ onClose, docked = false }: Props) {
           : `${data.slideCount} slides at ${data.perSlide}s each = ${data.duration}s.`,
       )
       await load(slug)
-      setPreview(data.url)
+      openMedia(data.url)
     } catch (err) {
       setBuildNote(String(err instanceof Error ? err.message : err))
     } finally {
@@ -314,13 +351,23 @@ export default function ExportsGallery({ onClose, docked = false }: Props) {
       )}
 
       <div className="mb-3 flex flex-wrap gap-1.5">
-        {!open.variants?.tiktok && (
+        {/* Offered again when the set is stale. The button used to disappear the
+            moment a tiktok/ folder existed, so the "rebuild before posting"
+            warning below pointed at a control that was no longer on screen —
+            /api/export-tiktok overwrites, so there was never a reason to hide
+            it. */}
+        {(!open.variants?.tiktok || open.staleVariants?.includes('tiktok')) && (
           <button
             onClick={() => buildTikTok(open.slug)}
             disabled={building}
-            className="flex-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand disabled:opacity-50"
+            className={cn(
+              'flex-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold disabled:opacity-50',
+              open.staleVariants?.includes('tiktok')
+                ? 'border-destructive/40 bg-destructive/10 text-destructive hover:border-destructive'
+                : 'border-border bg-card text-muted-foreground hover:border-brand hover:text-brand',
+            )}
           >
-            {building ? 'Working…' : 'Build TikTok set'}
+            {building ? 'Working…' : open.variants?.tiktok ? 'Rebuild TikTok set' : 'Build TikTok set'}
           </button>
         )}
         {[2, 2.5, 3].map((secs) => (
@@ -350,14 +397,14 @@ export default function ExportsGallery({ onClose, docked = false }: Props) {
             {open.videos.map((v) => (
               <div key={v.url} className="flex items-center gap-1.5">
                 <button
-                  onClick={() => setPreview(v.url)}
+                  onClick={() => openMedia(v.url)}
                   className={cn(
                     'min-w-0 flex-1 truncate rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-semibold',
-                    preview === v.url
+                    selectedMedia === v.url
                       ? 'border-brand text-brand'
                       : 'border-border text-muted-foreground hover:border-brand hover:text-brand',
                   )}
-                  title={v.filename}
+                  title={onPlay ? `${v.filename} — plays in the phone` : v.filename}
                 >
                   ▶ {v.filename}
                 </button>
@@ -400,18 +447,18 @@ export default function ExportsGallery({ onClose, docked = false }: Props) {
 
       <div className={cn('mb-4 grid gap-2', platform === 'default' ? 'grid-cols-3' : 'grid-cols-4')}>
         {(platform === 'default' ? open.slides : open.variants?.[platform]?.slides ?? []).map((s, i) => (
-          <button key={s} onClick={() => setPreview(s)}
-             title={/\.(mp4|mov|webm)$/i.test(s) ? 'Play' : 'View'}
+          <button key={s} onClick={() => openMedia(s)}
+             title={isVideo(s) ? 'Play' : 'View'}
              className={cn(
                'relative overflow-hidden rounded-md border hover:border-brand',
-               preview === s ? 'border-brand ring-2 ring-brand/30' : 'border-border',
+               selectedMedia === s ? 'border-brand ring-2 ring-brand/30' : 'border-border',
              )}>
             <SlideMedia
               src={s}
               alt={`slide ${i + 1}`}
               className={cn('w-full object-cover', platform === 'default' ? 'aspect-[4/5]' : 'aspect-[9/16]')}
             />
-            {/\.(mp4|mov|webm)$/i.test(s) && (
+            {isVideo(s) && (
               <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[9px] font-bold text-white">
                 MP4
               </span>
