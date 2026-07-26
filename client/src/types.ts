@@ -100,6 +100,19 @@ export function genId() {
   return `slide_${++idCounter}_${Date.now()}`
 }
 
+/**
+ * Give every slide an id and a number.
+ *
+ * Slides written by the server (Generate, Batch) are stored without ids — most
+ * of the saved carousels on disk have none — so a carousel loaded from the
+ * Library came back with `undefined` for every key, which React cannot tell
+ * apart when the list is reordered. Anything that identifies a slide rather
+ * than its position needs this run over slides arriving from the server.
+ */
+export function withIds(slides: Slide[]): Slide[] {
+  return slides.map((s, i) => ({ ...s, id: s.id || genId(), slideNumber: s.slideNumber ?? i + 1 }))
+}
+
 export function defaultSlides(): Slide[] {
   return [
     {

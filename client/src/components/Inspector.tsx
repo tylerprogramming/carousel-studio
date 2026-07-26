@@ -3,6 +3,7 @@ import { Slide, CarouselCaptions, CarouselConfig } from '../types'
 import SlideEditor from './SlideEditor'
 import CaptionEditor from './CaptionEditor'
 import BgImageCard, { BgImageCardProps } from './BgImageCard'
+import { Finding, sortFindings } from '../hooks/useSlideCheck'
 import { cn } from '../lib/utils'
 
 /**
@@ -16,6 +17,10 @@ import { cn } from '../lib/utils'
  * Caption is the odd one out: it edits the whole carousel rather than the
  * current slide. It lives here anyway because this is the panel you already
  * have open while writing the carousel.
+ *
+ * Findings sit above the tabs rather than in one of them, because the fix for
+ * a finding lands in a different tab depending on the finding: shorten the
+ * headline in Content, drop textScale in Style, add a bottom fade in Image.
  */
 
 type Tab = 'content' | 'style' | 'image' | 'caption'
@@ -30,6 +35,8 @@ interface Props extends Omit<BgImageCardProps, 'slide' | 'allSlides'> {
   platform: CarouselConfig['platform']
   /** Export folder name, so generated captions land next to the slides. */
   slug: string
+  /** Pre-export findings for this slide. */
+  findings?: Finding[]
 }
 
 const TABS: { id: Tab; label: string }[] = [
@@ -41,13 +48,39 @@ const TABS: { id: Tab; label: string }[] = [
 
 export default function Inspector({
   slide, allSlides, onChange,
-  captions, onCaptionsChange, carouselTitle, platform, slug,
+  captions, onCaptionsChange, carouselTitle, platform, slug, findings = [],
   ...bg
 }: Props) {
   const [tab, setTab] = useState<Tab>('content')
 
   return (
     <div className="flex w-[360px] min-w-[320px] max-w-[400px] shrink-0 flex-col overflow-hidden border-l border-border bg-card">
+      {findings.length > 0 && (
+        <div className="flex shrink-0 flex-col gap-2 border-b border-border bg-secondary px-3 py-2.5">
+          <span className="text-[10px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
+            This slide
+          </span>
+          {sortFindings(findings).map((f, i) => (
+            <div key={`${f.code}-${i}`} className="flex gap-2">
+              <span
+                className={cn(
+                  'mt-[5px] h-[7px] w-[7px] shrink-0 rounded-full',
+                  f.level === 'error' ? 'bg-destructive' : 'bg-amber-500',
+                )}
+              />
+              <span
+                className={cn(
+                  'text-[11px] leading-[1.45]',
+                  f.level === 'error' ? 'text-destructive' : 'text-muted-foreground',
+                )}
+              >
+                {f.message}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex shrink-0 gap-1 border-b border-border p-2">
         {TABS.map((t) => (
           <button

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Slide, CarouselConfig, CarouselCaptions, defaultSlides, genId } from './types'
+import { Slide, CarouselConfig, CarouselCaptions, defaultSlides, genId, withIds } from './types'
 import { useIsMobile } from './hooks/useMediaQuery'
 import { useHistory } from './hooks/useHistory'
 import { useJobs, Job } from './hooks/useJobs'
+import { useSlideCheck, worstLevel } from './hooks/useSlideCheck'
 import { cn } from './lib/utils'
 import SlideList from './components/SlideList'
 import Inspector from './components/Inspector'
@@ -16,6 +17,7 @@ import ExportsGallery from './components/ExportsGallery'
 import JobStrip from './components/JobStrip'
 import TikTokPanel from './components/TikTokPanel'
 import ReadinessRail from './components/ReadinessRail'
+import CheckBadge from './components/CheckBadge'
 import {
   AppLogo, IgLogo, LiLogo, TikTokLogo, FolderIcon, SparkleIcon, BoltIcon,
   UndoIcon, RedoIcon, SlidesTabIcon, EditTabIcon, BgTabIcon, PreviewTabIcon,
@@ -80,7 +82,7 @@ export default function App() {
         if (data?.slides) {
           resetConfig({
             title: data.title, platform: data.platform ?? 'instagram',
-            slides: data.slides, captions: data.captions ?? {},
+            slides: withIds(data.slides), captions: data.captions ?? {},
           })
           setCarouselId(data.id)
         }
@@ -122,7 +124,7 @@ export default function App() {
     // here meant the next autosave wrote the config back without them.
     resetConfig({
       title: data.title, platform: data.platform ?? 'instagram',
-      slides: data.slides, captions: data.captions ?? {},
+      slides: withIds(data.slides), captions: data.captions ?? {},
     })
     setActiveIndex(0); setPreviewIndex(0); setShowSaved(false)
     localStorage.setItem(CAROUSEL_ID_KEY, data.id)
@@ -261,6 +263,10 @@ export default function App() {
   }, [setConfig])
 
   const { jobs, running, start: startJob, cancel: cancelJob } = useJobs(carouselId, config.title, applyJob)
+
+  // Layout defects, found while editing rather than after export. Advisory
+  // only — nothing here stops Export.
+  const check = useSlideCheck(config.slides)
 
   const handleExport = useCallback(async () => {
     setExporting(true); setExportMsg(''); setExportedUrls([])
@@ -445,6 +451,10 @@ export default function App() {
 
       {!isMobile && (
         <div className="flex items-center gap-2">
+          <CheckBadge
+            errors={check.errors} warnings={check.warnings} loaded={check.loaded}
+            onJump={() => { if (check.firstIndex >= 0) handleSelect(check.firstIndex) }}
+          />
           <button onClick={() => setShowGenerate(true)}
             className="flex items-center gap-1.5 rounded-[9px] border-[1.5px] border-brand bg-brand-light px-3 py-[7px] text-xs font-bold text-brand transition-all hover:bg-brand hover:text-white">
             <SparkleIcon /> Generate
@@ -545,6 +555,7 @@ export default function App() {
               <SlideList
                 slides={config.slides} activeIndex={activeIndex} onSelect={handleSelect}
                 onAdd={addSlide} onRemove={removeSlide} onReorder={reorder} onDuplicate={duplicateSlide}
+                findingsFor={check.findingsFor}
               />
               <TikTokPanel slides={config.slides} activeIndex={activeIndex} carouselId={carouselId} carouselTitle={config.title} />
             </>
@@ -553,6 +564,7 @@ export default function App() {
               <SlideList
                 slides={config.slides} activeIndex={activeIndex} onSelect={handleSelect}
                 onAdd={addSlide} onRemove={removeSlide} onReorder={reorder} onDuplicate={duplicateSlide}
+                findingsFor={check.findingsFor}
               />
               <div className="flex min-w-[320px] flex-1 flex-col overflow-hidden bg-background">
                 {controlsPanel}
@@ -570,6 +582,7 @@ export default function App() {
                   captions={config.captions ?? {}} onCaptionsChange={updateCaptions}
                   carouselTitle={config.title} platform={config.platform} slug={slugify(config.title)}
                   startJob={startJob} runningJobs={running}
+                  findings={check.findingsFor(activeSlide)}
                 />
               )}
             </>
@@ -620,6 +633,7 @@ export default function App() {
                 <div className="grid grid-cols-2 gap-2.5">
                   {config.slides.map((slide, i) => {
                     const thumbW = Math.floor((window.innerWidth - 52) / 2)
+                    const level = worstLevel(check.findingsFor(slide))
                     return (
                       <div
                         key={slide.id}
@@ -634,6 +648,16 @@ export default function App() {
                         <div className="absolute bottom-1.5 right-1.5 z-10 rounded-md bg-black/55 px-[7px] py-0.5 text-[10px] font-bold text-white">
                           {i + 1}
                         </div>
+                        {/* Same mark as the desktop strip. The messages behind
+                            it are in the Inspector, on the BG tab. */}
+                        {level && (
+                          <div
+                            className={cn(
+                              'absolute bottom-2 left-2 z-10 h-[11px] w-[11px] rounded-full ring-2 ring-white/85',
+                              level === 'error' ? 'bg-destructive' : 'bg-amber-500',
+                            )}
+                          />
+                        )}
                         {config.slides.length > 1 && (
                           <button
                             onClick={(e) => { e.stopPropagation(); removeSlide(i) }}
@@ -685,6 +709,7 @@ export default function App() {
                   captions={config.captions ?? {}} onCaptionsChange={updateCaptions}
                   carouselTitle={config.title} platform={config.platform} slug={slugify(config.title)}
                   startJob={startJob} runningJobs={running}
+                  findings={check.findingsFor(activeSlide)}
                 />
               </div>
             )}
