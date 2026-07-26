@@ -22,6 +22,12 @@ Payload:
   bgColor  : "#RRGGBB" pad colour, default #12141A
   margin   : side margin in px, default 110
   topBias  : how far up the content sits, 0-1, default 0.38
+  format   : "png" or "jpg", default png
+
+TikTok photo slideshows take JPG, not PNG, so anything destined for a
+slideshow post has to be written as jpg. Blotato lists "JPG" for both TikTok
+image and photo-slideshow posts, and WebP/JPEG in its media requirements;
+PNG appears in neither list.
 """
 
 import json
@@ -60,9 +66,18 @@ def reframe(cfg):
     y = max(0, min(free, round(free * top_bias)))
     canvas.paste(scaled, (margin, y))
 
-    os.makedirs(os.path.dirname(cfg['output']) or '.', exist_ok=True)
-    canvas.save(cfg['output'], 'PNG')
-    return cfg['output']
+    out = cfg['output']
+    fmt = str(cfg.get('format', 'png')).lower()
+    if fmt in ('jpg', 'jpeg'):
+        out = os.path.splitext(out)[0] + '.jpg'
+    os.makedirs(os.path.dirname(out) or '.', exist_ok=True)
+    if fmt in ('jpg', 'jpeg'):
+        # quality 92 keeps type crisp; TikTok caps images at 20 MB and these
+        # land around 200 KB, so there is no reason to compress harder.
+        canvas.save(out, 'JPEG', quality=92, subsampling=0)
+    else:
+        canvas.save(out, 'PNG')
+    return out
 
 
 def main():

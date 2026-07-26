@@ -980,7 +980,8 @@ app.post('/api/summary-slide', async (c) => {
 // Writes to <slug>/tiktok/ so the gallery picks it up as a variant.
 // Available here and from the CLI (tiktok_safe.py) so both routes agree.
 app.post('/api/export-tiktok', async (c) => {
-  const { carouselSlug, bgColor = '#12141A', margin, topBias } = await c.req.json()
+  // JPG by default: TikTok photo slideshows take JPG, not PNG.
+  const { carouselSlug, bgColor = '#12141A', margin, topBias, format = 'jpg' } = await c.req.json()
   if (!carouselSlug) return c.json({ error: 'carouselSlug is required' }, 400)
 
   const slugDir = join(exportDir(), carouselSlug)
@@ -999,7 +1000,7 @@ app.post('/api/export-tiktok', async (c) => {
 
   const outcomes = await Promise.all(stills.map(async (name) => {
     const payload = JSON.stringify({
-      input: join(slugDir, name), output: join(outDir, name), bgColor,
+      input: join(slugDir, name), output: join(outDir, name), bgColor, format,
       ...(margin != null ? { margin } : {}), ...(topBias != null ? { topBias } : {}),
     })
     const proc = Bun.spawn(['python3', script, payload], { stdout: 'ignore', stderr: 'pipe' })
@@ -1187,7 +1188,7 @@ function readSlideSet(dir: string, urlPrefix: string) {
   // newer artifact for that slide.
   const byNumber = new Map<number, string>()
   for (const f of files) {
-    const m = f.match(/^slide_(\d+)\.(png|mp4)$/i)
+    const m = f.match(/^slide_(\d+)\.(png|jpe?g|mp4)$/i)
     if (!m) continue
     const n = parseInt(m[1])
     if (!byNumber.has(n) || m[2].toLowerCase() === 'mp4') byNumber.set(n, f)
