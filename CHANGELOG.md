@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.1.4
+
+**Exports is a docked panel, not a modal.** Exports is where you confirm the
+work is right, which is exactly when you want the editor still in front of
+you. A modal made checking a slide and then fixing it three separate trips.
+
+It now takes the right-hand column, swapping with the Inspector rather than
+adding a fourth column — at the 1200px desktop breakpoint a fourth column
+would pin the canvas to its 320px floor. Sharing the slot also gives that
+column one meaning at a time: change this slide, or check what shipped. Below
+1200px the desktop row is not rendered at all, so the overlay remains the
+fallback there.
+
+Every capability is intact: variant tabs, video playback, the build buttons,
+captions, downloads, and the stale-variant warning.
+
 ## 2.1.3
 
 **Check findings appear on the slides.** The pre-export check finds real
