@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Slide, CarouselConfig, defaultSlides, genId } from './types'
+import { Slide, CarouselConfig, CarouselCaptions, defaultSlides, genId } from './types'
 import { useIsMobile } from './hooks/useMediaQuery'
 import { useHistory } from './hooks/useHistory'
 import { useJobs, Job } from './hooks/useJobs'
@@ -12,7 +12,6 @@ import InstagramPreview from './components/InstagramPreview'
 import GenerateModal from './components/GenerateModal'
 import SavedCarouselsDrawer from './components/SavedCarouselsDrawer'
 import BatchModal from './components/BatchModal'
-import CaptionModal from './components/CaptionModal'
 import ExportsGallery from './components/ExportsGallery'
 import JobStrip from './components/JobStrip'
 import TikTokPanel from './components/TikTokPanel'
@@ -61,7 +60,6 @@ export default function App() {
   const [showGenerate, setShowGenerate] = useState(false)
   const [showSaved, setShowSaved]       = useState(false)
   const [showBatch, setShowBatch]       = useState(false)
-  const [showCaptions, setShowCaptions] = useState(false)
   const [showExports, setShowExports]   = useState(false)
   const [exportFormat, setExportFormat] = useState<'png' | 'pdf' | 'both'>('both')
   const [mobileTab, setMobileTab]       = useState<MobileTab>('preview')
@@ -76,7 +74,10 @@ export default function App() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data?.slides) {
-          resetConfig({ title: data.title, platform: data.platform ?? 'instagram', slides: data.slides })
+          resetConfig({
+            title: data.title, platform: data.platform ?? 'instagram',
+            slides: data.slides, captions: data.captions ?? {},
+          })
           setCarouselId(data.id)
         }
       })
@@ -113,7 +114,12 @@ export default function App() {
 
   function loadCarousel(data: any) {
     setCarouselId(data.id)
-    resetConfig({ title: data.title, platform: data.platform ?? 'instagram', slides: data.slides })
+    // Captions have to come back with the rest of the carousel. Dropping them
+    // here meant the next autosave wrote the config back without them.
+    resetConfig({
+      title: data.title, platform: data.platform ?? 'instagram',
+      slides: data.slides, captions: data.captions ?? {},
+    })
     setActiveIndex(0); setPreviewIndex(0); setShowSaved(false)
     localStorage.setItem(CAROUSEL_ID_KEY, data.id)
     setSaveStatus('saved')
@@ -121,7 +127,7 @@ export default function App() {
 
   function newCarousel() {
     setCarouselId(newId())
-    resetConfig({ title: 'New Carousel', platform: 'instagram', slides: defaultSlides() })
+    resetConfig({ title: 'New Carousel', platform: 'instagram', slides: defaultSlides(), captions: {} })
     setActiveIndex(0); setPreviewIndex(0)
     setSaveStatus('unsaved')
   }
@@ -150,6 +156,12 @@ export default function App() {
       return
     }
     setConfig((c) => ({ ...c, slides: c.slides.map((s, i) => (i === activeIndex ? updated : s)) }))
+  }
+
+  function updateCaptions(next: CarouselCaptions) {
+    // Stamped on write so the Library can tell fresh copy from copy that
+    // predates the slides it describes.
+    setConfig((c) => ({ ...c, captions: { ...next, updatedAt: new Date().toISOString() } }))
   }
 
   const renumber = (slides: Slide[]) => slides.map((s, i) => ({ ...s, slideNumber: i + 1 }))
@@ -427,10 +439,6 @@ export default function App() {
 
       {!isMobile && (
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowCaptions(true)}
-            className="rounded-[9px] border-[1.5px] border-coral/40 bg-coral-light px-3 py-[7px] text-xs font-bold text-coral-dark transition-all hover:bg-coral hover:text-white">
-            Captions
-          </button>
           <button onClick={() => setShowGenerate(true)}
             className="flex items-center gap-1.5 rounded-[9px] border-[1.5px] border-brand bg-brand-light px-3 py-[7px] text-xs font-bold text-brand transition-all hover:bg-brand hover:text-white">
             <SparkleIcon /> Generate
@@ -519,7 +527,6 @@ export default function App() {
       {showSaved && <SavedCarouselsDrawer onClose={() => setShowSaved(false)} onLoad={loadCarousel} onNew={newCarousel} currentId={carouselId} />}
       {showBatch && <BatchModal onClose={() => setShowBatch(false)} onDone={() => { setShowBatch(false); setShowSaved(true) }} />}
       {showExports && <ExportsGallery onClose={() => setShowExports(false)} />}
-      {showCaptions && <CaptionModal onClose={() => setShowCaptions(false)} config={config} slug={slugify(config.title)} />}
 
       {header}
       <JobStrip jobs={running} onCancel={cancelJob} />
@@ -554,6 +561,8 @@ export default function App() {
                 <Inspector
                   slide={activeSlide} allSlides={config.slides} onChange={updateSlide}
                   onSlideChange={updateSlide}
+                  captions={config.captions ?? {}} onCaptionsChange={updateCaptions}
+                  carouselTitle={config.title} platform={config.platform} slug={slugify(config.title)}
                   startJob={startJob} runningJobs={running}
                 />
               )}
@@ -655,6 +664,8 @@ export default function App() {
                 <Inspector
                   slide={activeSlide} allSlides={config.slides} onChange={updateSlide}
                   onSlideChange={updateSlide}
+                  captions={config.captions ?? {}} onCaptionsChange={updateCaptions}
+                  carouselTitle={config.title} platform={config.platform} slug={slugify(config.title)}
                   startJob={startJob} runningJobs={running}
                 />
               </div>
