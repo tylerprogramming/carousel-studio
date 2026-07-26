@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.1.2
+
+**Readiness rail in the editor.** Whether a carousel could be posted took three
+places to answer: the Library drawer, the Exports gallery, and the filesystem.
+You are never in the Library while you are editing.
+
+A fixed-height strip along the bottom now shows four pips: caption, gate,
+exported, TikTok set. Caption and gate read from memory so they update as you
+type; the disk-backed two come from a new
+`GET /api/carousels/:id/readiness`. Hovering a pip says what is missing and
+where to fix it. When everything is satisfied it says so rather than
+disappearing — a vanishing indicator is worse than a calm one.
+
+The readiness logic moved into one `carouselStatus()` used by both the list
+endpoint and the new one, so there is still a single definition of "ready"
+rather than two that can drift.
+
 ## 2.1.1
 
 **Caption tab in the Inspector.** Captions were a field on the carousel with
