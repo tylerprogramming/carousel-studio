@@ -6,6 +6,18 @@ import { cn } from '../lib/utils'
  *
  * Distinct from the Library drawer: that lists editable projects, this lists
  * finished output — the PNG sets and PDFs sitting in the export directory.
+ *
+ * It renders two ways. Docked, it is a column in the editor row, because this
+ * is the panel you check work against: as a modal, spotting a bad slide meant
+ * closing the gallery, fixing the slide, and reopening it to look again. Docked
+ * the canvas stays live behind you and the round trip disappears.
+ *
+ * The overlay is kept for narrow windows, where the editor row isn't rendered
+ * at all and there is no column to dock into.
+ *
+ * It stays a viewer either way. Picking an export does not load it into the
+ * editor — the thing on disk is finished, and the editable original is one
+ * click away in the Library.
  */
 
 interface SlideSet {
@@ -37,7 +49,11 @@ const PLATFORM_LABEL: Record<string, string> = {
 }
 const labelFor = (key: string) => PLATFORM_LABEL[key] ?? key
 
-interface Props { onClose: () => void }
+interface Props {
+  onClose: () => void
+  /** Render as a column in the editor row instead of an overlay. */
+  docked?: boolean
+}
 
 function timeAgo(ms: number) {
   if (!ms) return ''
@@ -72,7 +88,7 @@ function SlideMedia({ src, className, alt, controls }: {
   return <img src={src} alt={alt} loading="lazy" className={className} />
 }
 
-export default function ExportsGallery({ onClose }: Props) {
+export default function ExportsGallery({ onClose, docked = false }: Props) {
   const [items, setItems] = useState<ExportedCarousel[]>([])
   const [dir, setDir] = useState('')
   const [loading, setLoading] = useState(true)
@@ -162,6 +178,299 @@ export default function ExportsGallery({ onClose }: Props) {
 
   const shown = items.filter((i) => i.slug.toLowerCase().includes(query.toLowerCase()))
 
+  const filterInput = (
+    <input
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+      placeholder="Filter…"
+      className={cn(
+        'h-8 rounded-lg border border-border bg-secondary px-3 text-xs outline-none focus:border-brand',
+        docked ? 'w-full' : 'ml-auto w-48',
+      )}
+    />
+  )
+
+  const grid = (
+    <>
+      {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {!loading && !items.length && (
+        <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+          <p className="text-sm text-muted-foreground">Nothing exported yet.</p>
+          <p className="max-w-sm text-xs text-muted-foreground">
+            Hit Export All and finished carousels show up here, read straight off disk.
+          </p>
+        </div>
+      )}
+      <div className={cn(
+        'grid gap-4',
+        // A docked column is ~360px wide, so the cards have to be small enough
+        // to still land two across.
+        docked
+          ? 'grid-cols-[repeat(auto-fill,minmax(130px,1fr))]'
+          : 'grid-cols-[repeat(auto-fill,minmax(150px,1fr))]',
+      )}>
+        {shown.map((c) => (
+          <button
+            key={c.slug}
+            onClick={() => setOpen(c)}
+            className={cn(
+              'group flex flex-col overflow-hidden rounded-xl border-2 text-left transition-all',
+              open?.slug === c.slug ? 'border-brand' : 'border-border hover:border-brand/50',
+            )}
+          >
+            <div className="relative aspect-[4/5] w-full overflow-hidden bg-secondary">
+              <SlideMedia src={c.cover} alt={c.slug} className="h-full w-full object-cover" />
+              <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-px text-[10px] font-bold text-white">
+                {c.slideCount}
+              </span>
+            </div>
+            <div className="p-2">
+              <div className="truncate text-[11px] font-semibold text-foreground" title={c.slug}>{c.slug}</div>
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                <span>{timeAgo(c.modified)}</span>
+                {c.pdf && <span className="rounded bg-secondary px-1">PDF</span>}
+                {c.hasCaptions && <span className="rounded bg-secondary px-1">CAP</span>}
+                {!!c.videos?.length && (
+                  <span className="rounded bg-brand/15 px-1 text-brand" title="Has a full-carousel video">
+                    VID
+                  </span>
+                )}
+                {Object.keys(c.variants ?? {}).map((key) => (
+                  <span
+                    key={key}
+                    title={c.staleVariants?.includes(key)
+                      ? `${labelFor(key)} set is older than the main set — re-export it`
+                      : `${labelFor(key)} version available`}
+                    className={cn(
+                      'rounded px-1',
+                      c.staleVariants?.includes(key)
+                        ? 'bg-destructive/15 text-destructive'
+                        : 'bg-brand/15 text-brand',
+                    )}
+                  >
+                    {labelFor(key)}{c.staleVariants?.includes(key) ? ' !' : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </>
+  )
+
+  const detail = open && (
+    <>
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-bold text-foreground">{open.slug}</div>
+          <div className="text-[11px] text-muted-foreground">
+            {(platform === 'default' ? open.slideCount : open.variants?.[platform]?.slideCount ?? 0)} slides
+            {platform !== 'default' && ` · ${labelFor(platform)}`} · {timeAgo(open.modified)}
+          </div>
+        </div>
+        {/* Docked, closing the detail is the only way back to the list, so it
+            says so. In the overlay the list is still on screen next to it. */}
+        <button
+          onClick={() => setOpen(null)}
+          className={cn(
+            'shrink-0 leading-none text-muted-foreground hover:text-foreground',
+            docked ? 'text-[11px] font-semibold' : 'text-lg',
+          )}
+        >
+          {docked ? '← All exports' : '×'}
+        </button>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {open.pdf && (
+          <a href={open.pdf} download
+             className="rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand">
+            Download PDF
+          </a>
+        )}
+        <a href={open.cover} download
+           className="rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand">
+          Download cover
+        </a>
+      </div>
+
+      {preview && (
+        <div className="mb-3">
+          <div className="overflow-hidden rounded-lg border border-border bg-black">
+            <SlideMedia src={preview} alt="preview" controls
+                        className="max-h-[420px] w-full object-contain" />
+          </div>
+          <div className="mt-1 flex items-center justify-between">
+            <span className="truncate text-[10px] text-muted-foreground">
+              {preview.split('/').pop()}
+            </span>
+            <button onClick={() => setPreview(null)}
+                    className="text-[10px] text-muted-foreground hover:text-foreground">
+              close
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {!open.variants?.tiktok && (
+          <button
+            onClick={() => buildTikTok(open.slug)}
+            disabled={building}
+            className="flex-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand disabled:opacity-50"
+          >
+            {building ? 'Working…' : 'Build TikTok set'}
+          </button>
+        )}
+        {[2, 2.5, 3].map((secs) => (
+          <button
+            key={secs}
+            onClick={() => buildCarouselVideo(open.slug, secs)}
+            disabled={building}
+            title={`Hold each slide ${secs}s — about ${Math.round(secs * (open.slideCount + 0.4))}s total`}
+            className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand disabled:opacity-50"
+          >
+            {building ? '…' : `${secs}s/slide`}
+          </button>
+        ))}
+      </div>
+      {buildNote && (
+        <p className="mb-3 rounded-lg border border-border bg-secondary p-2 text-[11px] text-muted-foreground">
+          {buildNote}
+        </p>
+      )}
+
+      {!!open.videos?.length && (
+        <div className="mb-3">
+          <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
+            full-carousel video
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {open.videos.map((v) => (
+              <div key={v.url} className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setPreview(v.url)}
+                  className={cn(
+                    'min-w-0 flex-1 truncate rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-semibold',
+                    preview === v.url
+                      ? 'border-brand text-brand'
+                      : 'border-border text-muted-foreground hover:border-brand hover:text-brand',
+                  )}
+                  title={v.filename}
+                >
+                  ▶ {v.filename}
+                </button>
+                <a href={v.url} download
+                   className="shrink-0 rounded-lg border border-border px-2 py-1.5 text-[11px] text-muted-foreground hover:border-brand hover:text-brand">
+                  ↓
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {Object.keys(open.variants ?? {}).length > 0 && (
+        <div className="mb-3 flex gap-1">
+          {['default', ...Object.keys(open.variants ?? {})].map((key) => (
+            <button
+              key={key}
+              onClick={() => setPlatform(key)}
+              className={cn(
+                'rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all',
+                platform === key
+                  ? 'bg-brand text-white'
+                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+              )}
+            >
+              {labelFor(key)}
+              {open.staleVariants?.includes(key) && ' !'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {open.staleVariants?.includes(platform) && (
+        <p className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-[11px] text-destructive">
+          This set is older than the main one. It was not refreshed on the last
+          export, so posting it would ship stale slides.
+        </p>
+      )}
+
+      <div className={cn('mb-4 grid gap-2', platform === 'default' ? 'grid-cols-3' : 'grid-cols-4')}>
+        {(platform === 'default' ? open.slides : open.variants?.[platform]?.slides ?? []).map((s, i) => (
+          <button key={s} onClick={() => setPreview(s)}
+             title={/\.(mp4|mov|webm)$/i.test(s) ? 'Play' : 'View'}
+             className={cn(
+               'relative overflow-hidden rounded-md border hover:border-brand',
+               preview === s ? 'border-brand ring-2 ring-brand/30' : 'border-border',
+             )}>
+            <SlideMedia
+              src={s}
+              alt={`slide ${i + 1}`}
+              className={cn('w-full object-cover', platform === 'default' ? 'aspect-[4/5]' : 'aspect-[9/16]')}
+            />
+            {/\.(mp4|mov|webm)$/i.test(s) && (
+              <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[9px] font-bold text-white">
+                MP4
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {open.hasCaptions && (
+        <>
+          <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
+            captions.md
+          </div>
+          <pre className="whitespace-pre-wrap rounded-lg border border-border bg-card p-3 text-[11px] leading-relaxed text-foreground">
+            {captions ?? 'Loading…'}
+          </pre>
+          {captions && (
+            <button
+              onClick={() => navigator.clipboard.writeText(captions)}
+              className="mt-2 self-start rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand"
+            >
+              Copy captions
+            </button>
+          )}
+        </>
+      )}
+    </>
+  )
+
+  if (docked) {
+    // One column, not two: 360px has no room for a list beside a detail pane,
+    // so opening an export swaps the list out and the back button swaps it in.
+    return (
+      <aside className="flex w-[360px] min-w-[360px] shrink-0 flex-col overflow-hidden border-l border-border bg-card">
+        <div className="flex shrink-0 flex-col gap-2 border-b border-border px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <h2 className="text-[13px] font-bold text-foreground">Exports</h2>
+              <p className="truncate text-[10px] text-muted-foreground" title={dir}>
+                {loading ? 'Reading disk…' : `${items.length} on disk`}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              title="Close exports"
+              className="ml-auto text-xl leading-none text-muted-foreground hover:text-foreground"
+            >
+              ×
+            </button>
+          </div>
+          {filterInput}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          {open ? detail : grid}
+        </div>
+      </aside>
+    )
+  }
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
       <div
@@ -175,247 +484,16 @@ export default function ExportsGallery({ onClose }: Props) {
               {loading ? 'Reading disk…' : `${items.length} on disk · ${dir}`}
             </p>
           </div>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter…"
-            className="ml-auto h-8 w-48 rounded-lg border border-border bg-secondary px-3 text-xs outline-none focus:border-brand"
-          />
+          {filterInput}
           <button onClick={onClose} className="text-2xl leading-none text-muted-foreground hover:text-foreground">×</button>
         </div>
 
         <div className="flex min-h-0 flex-1">
-          {/* grid */}
-          <div className="flex-1 overflow-y-auto p-5">
-            {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
-            {!loading && !items.length && (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-                <p className="text-sm text-muted-foreground">Nothing exported yet.</p>
-                <p className="max-w-sm text-xs text-muted-foreground">
-                  Hit Export All and finished carousels show up here, read straight off disk.
-                </p>
-              </div>
-            )}
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
-              {shown.map((c) => (
-                <button
-                  key={c.slug}
-                  onClick={() => setOpen(c)}
-                  className={cn(
-                    'group flex flex-col overflow-hidden rounded-xl border-2 text-left transition-all',
-                    open?.slug === c.slug ? 'border-brand' : 'border-border hover:border-brand/50',
-                  )}
-                >
-                  <div className="relative aspect-[4/5] w-full overflow-hidden bg-secondary">
-                    <SlideMedia src={c.cover} alt={c.slug} className="h-full w-full object-cover" />
-                    <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-px text-[10px] font-bold text-white">
-                      {c.slideCount}
-                    </span>
-                  </div>
-                  <div className="p-2">
-                    <div className="truncate text-[11px] font-semibold text-foreground" title={c.slug}>{c.slug}</div>
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <span>{timeAgo(c.modified)}</span>
-                      {c.pdf && <span className="rounded bg-secondary px-1">PDF</span>}
-                      {c.hasCaptions && <span className="rounded bg-secondary px-1">CAP</span>}
-                      {!!c.videos?.length && (
-                        <span className="rounded bg-brand/15 px-1 text-brand" title="Has a full-carousel video">
-                          VID
-                        </span>
-                      )}
-                      {Object.keys(c.variants ?? {}).map((key) => (
-                        <span
-                          key={key}
-                          title={c.staleVariants?.includes(key)
-                            ? `${labelFor(key)} set is older than the main set — re-export it`
-                            : `${labelFor(key)} version available`}
-                          className={cn(
-                            'rounded px-1',
-                            c.staleVariants?.includes(key)
-                              ? 'bg-destructive/15 text-destructive'
-                              : 'bg-brand/15 text-brand',
-                          )}
-                        >
-                          {labelFor(key)}{c.staleVariants?.includes(key) ? ' !' : ''}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+          <div className="flex-1 overflow-y-auto p-5">{grid}</div>
 
-          {/* detail */}
           {open && (
             <div className="flex w-[380px] shrink-0 flex-col overflow-y-auto border-l border-border bg-background p-4">
-              <div className="mb-3 flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-bold text-foreground">{open.slug}</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {(platform === 'default' ? open.slideCount : open.variants?.[platform]?.slideCount ?? 0)} slides
-                    {platform !== 'default' && ` · ${labelFor(platform)}`} · {timeAgo(open.modified)}
-                  </div>
-                </div>
-                <button onClick={() => setOpen(null)} className="text-lg leading-none text-muted-foreground">×</button>
-              </div>
-
-              <div className="mb-4 flex flex-wrap gap-2">
-                {open.pdf && (
-                  <a href={open.pdf} download
-                     className="rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand">
-                    Download PDF
-                  </a>
-                )}
-                <a href={open.cover} download
-                   className="rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand">
-                  Download cover
-                </a>
-              </div>
-
-              {preview && (
-                <div className="mb-3">
-                  <div className="overflow-hidden rounded-lg border border-border bg-black">
-                    <SlideMedia src={preview} alt="preview" controls
-                                className="max-h-[420px] w-full object-contain" />
-                  </div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="truncate text-[10px] text-muted-foreground">
-                      {preview.split('/').pop()}
-                    </span>
-                    <button onClick={() => setPreview(null)}
-                            className="text-[10px] text-muted-foreground hover:text-foreground">
-                      close
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="mb-3 flex flex-wrap gap-1.5">
-                {!open.variants?.tiktok && (
-                  <button
-                    onClick={() => buildTikTok(open.slug)}
-                    disabled={building}
-                    className="flex-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand disabled:opacity-50"
-                  >
-                    {building ? 'Working…' : 'Build TikTok set'}
-                  </button>
-                )}
-                {[2, 2.5, 3].map((secs) => (
-                  <button
-                    key={secs}
-                    onClick={() => buildCarouselVideo(open.slug, secs)}
-                    disabled={building}
-                    title={`Hold each slide ${secs}s — about ${Math.round(secs * (open.slideCount + 0.4))}s total`}
-                    className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand disabled:opacity-50"
-                  >
-                    {building ? '…' : `${secs}s/slide`}
-                  </button>
-                ))}
-              </div>
-              {buildNote && (
-                <p className="mb-3 rounded-lg border border-border bg-secondary p-2 text-[11px] text-muted-foreground">
-                  {buildNote}
-                </p>
-              )}
-
-              {!!open.videos?.length && (
-                <div className="mb-3">
-                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
-                    full-carousel video
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    {open.videos.map((v) => (
-                      <div key={v.url} className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => setPreview(v.url)}
-                          className={cn(
-                            'flex-1 truncate rounded-lg border px-2.5 py-1.5 text-left text-[11px] font-semibold',
-                            preview === v.url
-                              ? 'border-brand text-brand'
-                              : 'border-border text-muted-foreground hover:border-brand hover:text-brand',
-                          )}
-                          title={v.filename}
-                        >
-                          ▶ {v.filename}
-                        </button>
-                        <a href={v.url} download
-                           className="rounded-lg border border-border px-2 py-1.5 text-[11px] text-muted-foreground hover:border-brand hover:text-brand">
-                          ↓
-                        </a>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {Object.keys(open.variants ?? {}).length > 0 && (
-                <div className="mb-3 flex gap-1">
-                  {['default', ...Object.keys(open.variants ?? {})].map((key) => (
-                    <button
-                      key={key}
-                      onClick={() => setPlatform(key)}
-                      className={cn(
-                        'rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all',
-                        platform === key
-                          ? 'bg-brand text-white'
-                          : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                      )}
-                    >
-                      {labelFor(key)}
-                      {open.staleVariants?.includes(key) && ' !'}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {open.staleVariants?.includes(platform) && (
-                <p className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-[11px] text-destructive">
-                  This set is older than the main one. It was not refreshed on the last
-                  export, so posting it would ship stale slides.
-                </p>
-              )}
-
-              <div className={cn('mb-4 grid gap-2', platform === 'default' ? 'grid-cols-3' : 'grid-cols-4')}>
-                {(platform === 'default' ? open.slides : open.variants?.[platform]?.slides ?? []).map((s, i) => (
-                  <button key={s} onClick={() => setPreview(s)}
-                     title={/\.(mp4|mov|webm)$/i.test(s) ? 'Play' : 'View'}
-                     className={cn(
-                       'relative overflow-hidden rounded-md border hover:border-brand',
-                       preview === s ? 'border-brand ring-2 ring-brand/30' : 'border-border',
-                     )}>
-                    <SlideMedia
-                      src={s}
-                      alt={`slide ${i + 1}`}
-                      className={cn('w-full object-cover', platform === 'default' ? 'aspect-[4/5]' : 'aspect-[9/16]')}
-                    />
-                    {/\.(mp4|mov|webm)$/i.test(s) && (
-                      <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[9px] font-bold text-white">
-                        MP4
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              {open.hasCaptions && (
-                <>
-                  <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.07em] text-muted-foreground">
-                    captions.md
-                  </div>
-                  <pre className="whitespace-pre-wrap rounded-lg border border-border bg-card p-3 text-[11px] leading-relaxed text-foreground">
-                    {captions ?? 'Loading…'}
-                  </pre>
-                  {captions && (
-                    <button
-                      onClick={() => navigator.clipboard.writeText(captions)}
-                      className="mt-2 self-start rounded-lg border border-border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:border-brand hover:text-brand"
-                    >
-                      Copy captions
-                    </button>
-                  )}
-                </>
-              )}
+              {detail}
             </div>
           )}
         </div>

@@ -430,8 +430,13 @@ export default function App() {
             className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-brand hover:text-brand">
             <FolderIcon /> Library
           </button>
-          <button onClick={() => setShowExports(true)}
-            className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-brand hover:text-brand">
+          <button onClick={() => setShowExports((v) => !v)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg border-[1.5px] px-2.5 py-1.5 text-xs font-semibold transition-all',
+              showExports
+                ? 'border-brand bg-brand-light text-brand'
+                : 'border-border bg-card text-muted-foreground hover:border-brand hover:text-brand',
+            )}>
             <FolderIcon /> Exports
           </button>
           <div className="flex items-center gap-0.5 rounded-lg border-[1.5px] border-border bg-secondary p-0.5">
@@ -542,7 +547,9 @@ export default function App() {
       {showGenerate && <GenerateModal onClose={() => setShowGenerate(false)} onGenerated={handleGenerated} platform={config.platform} />}
       {showSaved && <SavedCarouselsDrawer onClose={() => setShowSaved(false)} onLoad={loadCarousel} onNew={newCarousel} currentId={carouselId} />}
       {showBatch && <BatchModal onClose={() => setShowBatch(false)} onDone={() => { setShowBatch(false); setShowSaved(true) }} />}
-      {showExports && <ExportsGallery onClose={() => setShowExports(false)} />}
+      {/* Below 1200px the editor row isn't rendered, so there is no column to
+          dock into and Exports falls back to covering the screen. */}
+      {showExports && isMobile && <ExportsGallery onClose={() => setShowExports(false)} />}
 
       {header}
       <JobStrip jobs={running} onCancel={cancelJob} />
@@ -558,6 +565,7 @@ export default function App() {
                 findingsFor={check.findingsFor}
               />
               <TikTokPanel slides={config.slides} activeIndex={activeIndex} carouselId={carouselId} carouselTitle={config.title} />
+              {showExports && <ExportsGallery docked onClose={() => setShowExports(false)} />}
             </>
           ) : (
             <>
@@ -575,7 +583,15 @@ export default function App() {
                   />
                 </div>
               </div>
-              {activeSlide && (
+              {/* Exports takes the Inspector's slot rather than adding a fourth
+                  column: 184 + 320 canvas + 360 + 360 is 1224px of hard
+                  minimum, so beside the Inspector the canvas would sit at its
+                  floor on any 1200px window. Same slot also means one toggle
+                  swaps between "change this slide" and "check what shipped",
+                  and the canvas and selection survive the swap. */}
+              {showExports ? (
+                <ExportsGallery docked onClose={() => setShowExports(false)} />
+              ) : activeSlide && (
                 <Inspector
                   slide={activeSlide} allSlides={config.slides} onChange={updateSlide}
                   onSlideChange={updateSlide}
