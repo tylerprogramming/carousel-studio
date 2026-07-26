@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.1.5
+
+**One editor, one preview.** Choosing TikTok used to swap the whole desktop
+layout for a different panel, which meant the Inspector vanished — you could
+not edit a caption, a style or an image on a TikTok carousel — and the
+readiness rail was skipped. There were also two separate phone previews in the
+codebase, so a safe-area fix once landed in the copy that only rendered below
+1200px and looked like it had done nothing.
+
+The platform switcher now changes what the canvas shows and nothing else.
+`InstagramPreview.tsx` became `PlatformPreview.tsx` and is the only phone
+preview; `TikTokPanel.tsx` is deleted. Its "Exported for TikTok" block is not
+reproduced, because the Exports panel already rendered every part of it for
+every platform — the panel was a second copy. Exports now auto-opens on the
+carousel you are editing, and video plays in the phone frame rather than a
+cramped inline player.
+
+Two things fixed on the way: the stale-variant banner said "rebuild before
+posting" while the rebuild button was hidden whenever a set already existed,
+and the safe-area guide was drawn in white on slides that are mostly light.
+
 ## 2.1.4
 
 **Exports is a docked panel, not a modal.** Exports is where you confirm the
