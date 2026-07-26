@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.1.1
+
+**Caption tab in the Inspector.** Captions were a field on the carousel with
+nowhere to edit them, reachable only through a modal that generated and
+disposed. Nine carousels reached the day before posting with no caption
+because nothing in the editor showed the field was empty. Now a fourth tab
+alongside Content / Style / Image, with Instagram, TikTok and LinkedIn copy,
+the gate keyword, hashtags, and live character counts against each platform's
+limit. Edits go through the same history as everything else, so undo works.
+
+Fixes a bug that would have destroyed the backfilled captions: `config.captions`
+was dropped when loading a carousel, and since autosave POSTs the whole config
+back, opening one and touching anything would have written its caption away
+after the debounce.
+
+The captions modal is gone. Two entry points would have disagreed about where
+a caption lives.
+
 ## 2.1.0
 
 TikTok, and video that plays.

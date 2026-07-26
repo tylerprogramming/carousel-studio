@@ -1,6 +1,6 @@
 {
   "name": "carousel-studio",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "scripts": {
     "dev": "concurrently \"bun run server\" \"bun run client\"",
     "server": "bun --watch server.ts",
