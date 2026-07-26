@@ -1,5 +1,45 @@
 # Changelog
 
+## 2.1.0
+
+TikTok, and video that plays.
+
+### Added
+- **TikTok slideshow sets** — `tiktok_safe.py` re-frames a finished 4:5 slide
+  into 1080x1920 clear of TikTok's caption block, action rail and tab chrome.
+  Exports as JPG, which is what TikTok photo slideshows actually accept; PNG is
+  rejected. Build one from the Exports gallery or `POST /api/export-tiktok`.
+- **Carousel videos** — `slides_to_video.py` plays a whole set as one vertical
+  clip, paced per slide rather than squeezed into a fixed runtime. Optional
+  crossfade and audio bed.
+- **Summary cards** — `POST /api/summary-slide` lifts the takeaway from every
+  slide onto one card, and optionally carries it through to a clip.
+- **Audio** — an `audio/` folder and `audioPath` setting for video beds.
+  Nothing is bundled; see `audio/README.md`.
+- **Platform variants in the gallery** — any subfolder of slides shows as a
+  variant with its own tab, and a variant older than the main set is flagged
+  stale rather than silently posted.
+
+### Changed
+- The TikTok preview shows the exported framing instead of a full-bleed slide
+  TikTok would crop, and scales to the window like the Instagram one.
+- Carousel videos are paced at seconds per slide (default 2.5), so runtime
+  follows the slide count.
+- Video cards render at a larger text scale, since a card read in five seconds
+  needs bigger type than one you can pinch-zoom.
+
+### Fixed
+- **Terminal lines now wrap.** They were drawn without wrapping, so anything
+  past the window edge was silently cut. The preview wrapped; the exporter did
+  not.
+- Media is served with correct content types on every route. An mp4 came back
+  labelled as an image from three separate handlers, so video would not play.
+- Platform-variant paths 404'd into the SPA, so variant thumbnails rendered as
+  broken images.
+- The client and server derived export slugs differently, so exporting from the
+  UI wrote to a second folder and left the first silently stale.
+- Exported videos are viewable in the app rather than only on disk.
+
 ## 2.0.0
 
 A rewrite of the export path, the editor layout and the generation pipeline.
