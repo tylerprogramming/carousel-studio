@@ -15,6 +15,7 @@ import BatchModal from './components/BatchModal'
 import ExportsGallery from './components/ExportsGallery'
 import JobStrip from './components/JobStrip'
 import TikTokPanel from './components/TikTokPanel'
+import ReadinessRail from './components/ReadinessRail'
 import {
   AppLogo, IgLogo, LiLogo, TikTokLogo, FolderIcon, SparkleIcon, BoltIcon,
   UndoIcon, RedoIcon, SlidesTabIcon, EditTabIcon, BgTabIcon, PreviewTabIcon,
@@ -64,6 +65,9 @@ export default function App() {
   const [exportFormat, setExportFormat] = useState<'png' | 'pdf' | 'both'>('both')
   const [mobileTab, setMobileTab]       = useState<MobileTab>('preview')
   const [saveStatus, setSaveStatus]     = useState<'saved' | 'unsaved' | 'saving'>('saved')
+  // Bumped when an export finishes, which is the only moment the readiness rail
+  // needs to look at the disk again.
+  const [readinessKey, setReadinessKey] = useState(0)
 
   // On mount, reload the last-used carousel rather than starting blank
   const isLoaded = useRef(false)
@@ -279,6 +283,8 @@ export default function App() {
       setExportMsg(`Error: ${err}`)
     } finally {
       setExporting(false)
+      // Even a failed run can leave slides behind, so re-check either way.
+      setReadinessKey((k) => k + 1)
     }
   }, [config, exportFormat, saveCarousel])
 
@@ -569,6 +575,18 @@ export default function App() {
             </>
           )}
         </div>
+      )}
+
+      {/* Under the editor, not inside it: the question is about the carousel,
+          not the slide you happen to have selected. The TikTok panel is being
+          restructured separately and is left alone. */}
+      {!isMobile && config.platform !== 'tiktok' && (
+        <ReadinessRail
+          carouselId={carouselId}
+          slug={slugify(config.title)}
+          captions={config.captions ?? {}}
+          refreshKey={readinessKey}
+        />
       )}
 
       {isMobile && (

@@ -181,6 +181,50 @@ app.get('/api/themes', (c) => {
 
 // ── Carousel Save / Load ──────────────────────────────────────────────────────
 
+/**
+ * Everything needed to answer "can this be posted yet", in one place. It used
+ * to take the Library, the Exports gallery and the filesystem.
+ *
+ * The Library list and the editor's readiness rail both go through here, so
+ * there is one definition of ready rather than two that quietly disagree.
+ *
+ * `slugOverride` is for the editor: the title picks the export folder, and the
+ * title in the editor can be ahead of the title on disk.
+ */
+function carouselStatus(d: any, slugOverride?: string) {
+  // What has actually been exported for this carousel, so callers can say
+  // whether an Instagram, TikTok or video version exists rather than making
+  // you open the Exports gallery to find out.
+  const slug = slugOverride || slugFromTitle(d.title)
+  const slugDir = join(exportDir(), slug)
+  let exported: string[] = []
+  let hasVideo = false
+  if (existsSync(slugDir)) {
+    try {
+      const files = readdirSync(slugDir, { withFileTypes: true })
+      if (files.some((x) => x.isFile() && /^slide_\d+\.(png|mp4)$/i.test(x.name))) exported.push('default')
+      for (const sub of files.filter((x) => x.isDirectory())) {
+        try {
+          if (readdirSync(join(slugDir, sub.name)).some((n) => /^slide_\d+\./i.test(n))) exported.push(sub.name)
+        } catch { /* ignore */ }
+      }
+      hasVideo = files.some((x) => x.isFile() && /\.(mp4|mov|webm)$/i.test(x.name) && !/^slide_\d+\./i.test(x.name))
+    } catch { /* ignore */ }
+  }
+  const caps = d.captions || {}
+  const readiness = {
+    hasCaption: !!(caps.instagram || caps.linkedin || caps.tiktok),
+    hasGate: !!caps.gate,
+    hasExport: exported.includes('default'),
+    hasTikTok: exported.some((k: string) => k !== 'default'),
+    hasVideo,
+  }
+  const blockers: string[] = []
+  if (!readiness.hasCaption) blockers.push('no caption')
+  if (!readiness.hasExport) blockers.push('not exported')
+  return { slug, exported, hasVideo, readiness, blockers, ready: blockers.length === 0 }
+}
+
 // List all saved carousels (newest first)
 app.get('/api/carousels', (c) => {
   const files = readdirSync(CAROUSELS_DIR).filter((f) => f.endsWith('.json'))
@@ -188,43 +232,10 @@ app.get('/api/carousels', (c) => {
     .map((f) => {
       try {
         const d = JSON.parse(readFileSync(join(CAROUSELS_DIR, f), 'utf8'))
-        // What has actually been exported for this carousel, so the Library can
-        // say whether an Instagram, TikTok or video version exists rather than
-        // making you open the Exports gallery to find out.
-        const slug = slugFromTitle(d.title)
-        const slugDir = join(exportDir(), slug)
-        let exported: string[] = []
-        let hasVideo = false
-        if (existsSync(slugDir)) {
-          try {
-            const files = readdirSync(slugDir, { withFileTypes: true })
-            if (files.some((x) => x.isFile() && /^slide_\d+\.(png|mp4)$/i.test(x.name))) exported.push('default')
-            for (const sub of files.filter((x) => x.isDirectory())) {
-              try {
-                if (readdirSync(join(slugDir, sub.name)).some((n) => /^slide_\d+\./i.test(n))) exported.push(sub.name)
-              } catch { /* ignore */ }
-            }
-            hasVideo = files.some((x) => x.isFile() && /\.(mp4|mov|webm)$/i.test(x.name) && !/^slide_\d+\./i.test(x.name))
-          } catch { /* ignore */ }
-        }
-        // Everything needed to answer "can this be posted yet", in one place.
-        // It used to take the Library, the Exports gallery and the filesystem.
-        const caps = d.captions || {}
-        const readiness = {
-          hasCaption: !!(caps.instagram || caps.linkedin || caps.tiktok),
-          hasGate: !!caps.gate,
-          hasExport: exported.includes('default'),
-          hasTikTok: exported.some((k: string) => k !== 'default'),
-          hasVideo,
-        }
-        const blockers: string[] = []
-        if (!readiness.hasCaption) blockers.push('no caption')
-        if (!readiness.hasExport) blockers.push('not exported')
         return {
           id: d.id, title: d.title, platform: d.platform,
           slideCount: d.slides?.length ?? 0, savedAt: d.savedAt,
-          slug, exported, hasVideo, readiness, blockers,
-          ready: blockers.length === 0,
+          ...carouselStatus(d),
         }
       } catch { return null }
     })
@@ -247,6 +258,19 @@ app.get('/api/carousels/:id', (c) => {
   const path = join(CAROUSELS_DIR, `${c.req.param('id')}.json`)
   if (!existsSync(path)) return c.json({ error: 'Not found' }, 404)
   return c.json(JSON.parse(readFileSync(path, 'utf8')))
+})
+
+// Readiness for the one carousel that is open, so the editor's rail can answer
+// "is anything missing" without pulling the whole Library list.
+//
+// A carousel that has never been saved has no file yet; that is not an error,
+// it just means nothing is exported. The caller sends its live slug so the
+// answer is about the folder this carousel would export to right now.
+app.get('/api/carousels/:id/readiness', (c) => {
+  const path = join(CAROUSELS_DIR, `${c.req.param('id')}.json`)
+  let d: any = {}
+  try { if (existsSync(path)) d = JSON.parse(readFileSync(path, 'utf8')) } catch { /* treat as unsaved */ }
+  return c.json(carouselStatus(d, c.req.query('slug')))
 })
 
 // Delete a carousel
