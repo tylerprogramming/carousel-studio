@@ -5,12 +5,14 @@ export type SlideType = 'cover' | 'content' | 'cta'
  *
  * 'default'  — cream editorial layout: big headline, emphasis, body
  * 'terminal' — dark developer layout with a terminal window carrying the detail
+ * 'tall'     — the same terminal layout drawn at 1080x1920 instead of 1080x1350,
+ *              for TikTok, where a 4:5 slide has to be padded to fit
  *
  * A variant changes the whole composition, not just colours, so it is
  * implemented in both SlidePreview.tsx and generate_slide.py. Adding one means
  * adding it in both places or exports stop matching the preview.
  */
-export type SlideVariant = 'default' | 'terminal'
+export type SlideVariant = 'default' | 'terminal' | 'tall'
 
 export interface Slide {
   id: string

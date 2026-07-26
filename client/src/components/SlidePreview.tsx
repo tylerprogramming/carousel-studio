@@ -23,16 +23,77 @@ function blend(fg: string, bg: string, f: number) {
 }
 
 /**
+ * TikTok's own UI, in the 1080x1920 frame's coordinates. The same measurements
+ * generate_slide.py builds the tall geometry from. They are keep-out zones, not
+ * padding: the background still fills the whole frame, nothing readable sits
+ * under them.
+ */
+export const TALL_SAFE = { top: 130, right: 150, bottom: 340 } as const
+
+/**
+ * Every number that differs between the 4:5 terminal slide and its 9:16 twin.
+ * This is a copy of terminal_geometry() in generate_slide.py, field for field —
+ * that function is the specification and this table has to follow it.
+ *
+ * `floor` is the bottom of the usable frame. On a 4:5 slide that is the canvas
+ * bottom; on a tall slide it is the top of TikTok's caption block. Everything
+ * anchored to the bottom hangs off it, so the same offsets that place the
+ * footer and the terminal window at 4:5 place them at 9:16.
+ */
+export function terminalGeometry(tall: boolean) {
+  return tall
+    ? {
+        width: 1080, height: 1920,
+        padx: 84,
+        right: 1080 - TALL_SAFE.right,   // stop short of TikTok's action rail
+        railY: 160,          // below the status bar and the tab chrome
+        top: 300,            // the headline gets the top third to itself
+        winTop: 900,
+        winGap: 56,          // minimum air between the text above and the window
+        bodyTop: 980,
+        floor: 1920 - TALL_SAFE.bottom,  // top of TikTok's caption block
+      }
+    : {
+        width: 1080, height: 1350,
+        padx: 84,
+        right: 1080 - 84,
+        railY: 74,
+        top: 200,
+        winTop: 700,
+        winGap: 40,
+        bodyTop: 720,
+        floor: 1350,
+      }
+}
+
+/**
+ * Canvas aspect for any slide. Thumbnails, phone mockups and the slide strip
+ * size their boxes with this instead of hardcoding 1350/1080, which crops a
+ * tall slide's bottom third without saying so.
+ */
+export function slideAspect(slide: Pick<Slide, 'variant'>) {
+  const g = terminalGeometry(slide.variant === 'tall')
+  return g.height / g.width
+}
+
+/**
  * Terminal variant.
  *
  * Dark, mono, with the detail carried by a terminal window rather than a body
  * paragraph. Mirrored in generate_slide.py — change both together.
+ *
+ * Draws `terminal` at 1080x1350 and `tall` at 1080x1920. Same design, two
+ * canvases: the difference is entirely in terminalGeometry() above.
  */
 function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps>) {
   const { handle, username } = useSettings()
   const ts = slide.textScale ?? 1
   const s = (px: number) => Math.round(px * scale)
   const sf = (px: number) => Math.round(px * scale * ts)
+  // Font size in slide units, before the preview's own scale. Mirrors fs() in
+  // generate_slide.py, and the layout maths below has to work in slide units so
+  // it can be compared against the geometry table.
+  const fu = (px: number) => Math.max(8, Math.round(px * ts))
 
   const BG = slide.bgColor || '#12141A'
   const FG = slide.textColor || '#EEECE8'
@@ -40,8 +101,22 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
   const DIM = 'rgba(238,236,232,0.45)'
   const MONO = "'Menlo','SFMono-Regular',ui-monospace,monospace"
 
-  const W = s(1080), H = s(1350), PAD = s(84)
+  const g = terminalGeometry(slide.variant === 'tall')
+  const W = s(g.width), H = s(g.height), PAD = s(g.padx)
+  // CSS `right` and `bottom` are distances from the edge, not coordinates, so
+  // the geometry table's absolute edges are converted once here.
+  const RIGHT = s(g.width - g.right)
+  const BOTTOM = s(g.height - g.floor)
   const lines = slide.terminalLines ?? []
+
+  // Terminal window placement, mirroring generate_slide.py. The renderer lifts
+  // the window so it clears the footer once wrapped lines make it taller. The
+  // renderer also floors it at where the text above actually ended; the browser
+  // only knows that after layout, so that half is left to `maxHeight` below.
+  const lineH = Math.round(fu(29) * 1.9)
+  const winH = 62 + 26 * 2 + lineH * lines.length
+  const footerTop = g.floor - 130
+  const winTop = Math.min(g.winTop, footerTop - winH)
 
   return (
     <div style={{
@@ -85,7 +160,7 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
       )}
 
       {/* top rail */}
-      <div style={{ position: 'absolute', top: s(74), left: PAD, right: PAD, display: 'flex', justifyContent: 'space-between' }}>
+      <div style={{ position: 'absolute', top: s(g.railY), left: PAD, right: RIGHT, display: 'flex', justifyContent: 'space-between' }}>
         <span style={{ fontFamily: MONO, fontSize: s(26), color: DIM, letterSpacing: '0.08em' }}>
           {username}
         </span>
@@ -95,7 +170,7 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
       </div>
 
       {/* headline */}
-      <div style={{ position: 'absolute', top: s(200), left: PAD, right: PAD }}>
+      <div style={{ position: 'absolute', top: s(g.top), left: PAD, right: RIGHT }}>
         {slide.stepNumber != null && slide.type === 'content' && (
           <div style={{
             display: 'inline-block', background: AC, color: BG,
@@ -130,10 +205,10 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
       {/* terminal window */}
       {lines.length > 0 && (
         <div style={{
-          position: 'absolute', left: PAD, right: PAD, top: s(700),
+          position: 'absolute', left: PAD, right: RIGHT, top: s(winTop),
           // Mirrors generate_slide.py: the window must clear the footer once
           // wrapped lines make it taller.
-          maxHeight: s(1350 - 130) - s(700),
+          maxHeight: s(footerTop) - s(winTop),
           background: '#0B0D12', borderRadius: s(16), overflow: 'hidden',
           border: '1px solid rgba(255,255,255,0.07)',
         }}>
@@ -169,19 +244,21 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
       {/* Body copy. Sits under the terminal window when there is one. */}
       {slide.bodyText && (
         <div style={{
-          position: 'absolute', left: PAD, right: PAD,
-          // With a photo behind, 720 lands the copy on the brightest part of
-          // the frame. Drop it into the faded zone above the footer instead.
+          position: 'absolute', left: PAD, right: RIGHT,
+          // With a photo behind, the usual top lands the copy on the brightest
+          // part of the frame. Drop it into the faded zone above the footer
+          // instead — measured from the floor, not the canvas bottom, so a tall
+          // slide keeps it clear of TikTok's caption block.
           ...(lines.length > 0
-            ? { top: s(700) + s(62 + 52 + Math.round(29 * 1.9) * lines.length) + s(46) }
-            : slide.backgroundImage ? { bottom: s(150) } : { top: s(720) }),
+            ? { top: s(winTop + winH + 46) }
+            : slide.backgroundImage ? { bottom: BOTTOM + s(150) } : { top: s(g.bodyTop) }),
           fontFamily: MONO, fontSize: sf(32), lineHeight: 1.65,
           color: slide.bodyTextColor || FG,
         }}>{slide.bodyText}</div>
       )}
 
       {/* footer */}
-      <div style={{ position: 'absolute', bottom: s(64), left: PAD, right: PAD, display: 'flex', justifyContent: 'space-between' }}>
+      <div style={{ position: 'absolute', bottom: BOTTOM + s(64), left: PAD, right: RIGHT, display: 'flex', justifyContent: 'space-between' }}>
         <span style={{ fontFamily: MONO, fontSize: s(26), color: DIM }}>{handle}</span>
         {slide.slideNumber < totalSlides && (
           <span style={{ fontFamily: MONO, fontSize: s(26), color: AC }}>swipe →</span>
@@ -193,7 +270,8 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
 }
 
 function SlidePreview({ slide, scale = 1, totalSlides = 7 }: SlidePreviewProps) {
-  if (slide.variant === 'terminal') {
+  // Both terminal variants are the same drawing at two canvas sizes
+  if (slide.variant === 'terminal' || slide.variant === 'tall') {
     return <TerminalSlide slide={slide} scale={scale} totalSlides={totalSlides} />
   }
 

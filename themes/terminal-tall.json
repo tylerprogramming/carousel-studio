@@ -1,0 +1,10 @@
+{
+  "id": "terminal-tall",
+  "name": "Terminal Tall (9:16)",
+  "description": "The terminal layout drawn at 1080x1920 for TikTok, instead of a 4:5 slide padded to fit. Same palette as Terminal.",
+  "bgColor": "#12141A",
+  "textColor": "#EEECE8",
+  "accentColor": "#E07355",
+  "variant": "tall",
+  "order": 7
+}

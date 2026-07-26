@@ -27,7 +27,7 @@ the app. There is nothing to rebuild and no code to change.
 | `name` | no | Shown on hover. Falls back to the filename. |
 | `id` | no | Falls back to the filename. |
 | `description` | no | For your own reference. Not rendered. |
-| `variant` | no | `default` or `terminal`. See below. |
+| `variant` | no | `default`, `terminal` or `tall`. See below. |
 | `order` | no | Sort position in the swatch row. Unset sorts last. |
 
 A file missing any of the three colours is skipped, and a file with broken JSON
@@ -52,6 +52,17 @@ Most themes only change colours. `variant: "terminal"` also changes how the
 slide is drawn: mono type, a rail across the top, and a terminal window block
 instead of a body paragraph. Slides using it read `terminalLines` and
 `terminalTitle`.
+
+`variant: "tall"` is that same layout on a 1080x1920 canvas instead of
+1080x1350. It exists for TikTok: a 4:5 slide has to be scaled down and padded
+to fit a 9:16 frame, which leaves about 44% of the post as empty margin. A tall
+slide is drawn at 9:16 from the start, with its text laid out clear of TikTok's
+caption block, action rail and tab chrome, so it needs no reframing at all.
+Everything else — colours, type, the terminal window — is identical.
+
+Use it when the carousel is going to TikTok. Note the text column is narrower
+(it stops short of the action rail), so a headline that fit at 4:5 may not fit
+here; the pre-export check measures against whichever canvas the slide uses.
 
 If you are making a colour theme, leave `variant` out.
 

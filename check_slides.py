@@ -31,20 +31,17 @@ from generate_slide import (
     load_mono,
     luminance,
     mono_safe,
+    terminal_geometry,
     text_width,
     wrap_text,
 )
 from PIL import Image, ImageDraw
 
-# Layout constants mirrored from generate_terminal_slide. If that function's
-# geometry changes, these move with it or the check goes quietly wrong.
-PADX = 84
-# Two different limits, and conflating them caused false positives. The
-# terminal window is lifted to clear HEIGHT-130; the footer *text* is drawn at
-# HEIGHT-64, so body copy has more room than the window does.
-FOOTER_TOP = HEIGHT - 130
-BODY_LIMIT = HEIGHT - 80
-TERMINAL_TOP = 700
+# Layout comes from generate_terminal_slide's own table rather than a copy of
+# its constants, so a 4:5 slide and a tall one are each measured against the
+# geometry they will actually be drawn with. These used to be module-level
+# literals, which is fine while there is one canvas and silently wrong the
+# moment there are two.
 
 ERROR, WARN = 'error', 'warning'
 
@@ -68,9 +65,19 @@ def check_slide(draw, slide, index):
     bg = slide.get('bgColor') or '#12141A'
     fg = slide.get('textColor') or '#EEECE8'
     accent = slide.get('accentColor') or '#E07355'
-    is_terminal = slide.get('variant') == 'terminal'
+    # 'tall' is the same layout on a 1080x1920 canvas, so it is checked the
+    # same way with different numbers.
+    is_terminal = slide.get('variant') in ('terminal', 'tall')
     stype = slide.get('type', 'content')
-    avail = WIDTH - PADX * 2
+
+    g = terminal_geometry(slide.get('variant') == 'tall')
+    PADX = g['padx']
+    avail = g['right'] - PADX
+    # Two different limits, and conflating them caused false positives. The
+    # terminal window is lifted to clear floor-130; the footer *text* is drawn
+    # at floor-64, so body copy has more room than the window does.
+    FOOTER_TOP = g['floor'] - 130
+    BODY_LIMIT = g['floor'] - 80
 
     # ── empty ────────────────────────────────────────────────────────────────
     if not (slide.get('headline') or '').strip():
@@ -91,7 +98,7 @@ def check_slide(draw, slide, index):
         return out
 
     # Layout position, walked the same way generate_terminal_slide walks it.
-    y = 200
+    y = g['top']
     if slide.get('stepNumber') is not None and stype == 'content':
         y += fs(48) + 28 + 28
 
@@ -152,7 +159,7 @@ def check_slide(draw, slide, index):
         win_h = 62 + 52 + line_h * wrapped
         # The renderer lifts the window to clear the footer, floored at the
         # text above it. Only a window too tall for that gap really overflows.
-        win_top = max(y + 40, min(TERMINAL_TOP, FOOTER_TOP - win_h))
+        win_top = max(y + g['win_gap'], min(g['win_top'], FOOTER_TOP - win_h))
         win_bottom = win_top + win_h
         if win_bottom > FOOTER_TOP:
             add(ERROR, 'terminal_overflows_footer',
@@ -166,7 +173,7 @@ def check_slide(draw, slide, index):
         lines = wrap_text(draw, body, f_b, avail)
         adv = round(fs(32) * 1.65)
         top = (win_bottom + 46) if win_bottom else (
-            HEIGHT - 150 - len(lines) * adv if slide.get('backgroundImage') else 720)
+            g['floor'] - 150 - len(lines) * adv if slide.get('backgroundImage') else g['body_top'])
         bottom = top + len(lines) * adv
         if bottom > BODY_LIMIT:
             add(ERROR, 'body_overflows_footer',
@@ -191,7 +198,9 @@ def run(cfg):
                 'findings': [{'slide': 0, 'level': ERROR, 'code': 'no_slides',
                               'message': 'Carousel has no slides.'}]}
 
-    # One throwaway canvas for measurement, same size as the real one
+    # One throwaway canvas to measure text against. Its size does not matter —
+    # nothing is drawn on it, and wrap widths are passed in per slide — so a
+    # deck mixing 4:5 and tall slides shares this one.
     draw = ImageDraw.Draw(Image.new('RGB', (WIDTH, HEIGHT)))
     findings = []
     for i, slide in enumerate(slides):

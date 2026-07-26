@@ -31,6 +31,8 @@ interface SlideSet {
   slideCount: number
   slides: string[]
   cover: string
+  /** height/width of the cover, measured on disk by the server. */
+  aspect?: number
   modified: number
 }
 
@@ -39,6 +41,7 @@ interface ExportedCarousel {
   slideCount: number
   slides: string[]
   cover: string
+  aspect?: number
   pdf: string | null
   hasCaptions: boolean
   modified: number
@@ -55,6 +58,12 @@ const PLATFORM_LABEL: Record<string, string> = {
   default: 'IG', tiktok: 'TikTok', linkedin: 'LinkedIn', instagram: 'IG',
 }
 const labelFor = (key: string) => PLATFORM_LABEL[key] ?? key
+
+// What a set is shaped like, as measured on disk. A tall carousel exports at
+// 9:16 with no tiktok/ folder involved, so the default set is not always 4:5
+// and a hardcoded box cropped its bottom third.
+const FOUR_FIVE = 1350 / 1080
+const ratio = (aspect?: number) => `1 / ${aspect ?? FOUR_FIVE}`
 
 interface Props {
   onClose: () => void
@@ -81,8 +90,8 @@ function timeAgo(ms: number) {
 const isVideo = (src: string) => /\.(mp4|mov|webm)$/i.test(src)
 
 /** A slide is a PNG or, for a moving cover, an MP4. Pick the right element. */
-function SlideMedia({ src, className, alt, controls }: {
-  src: string; className?: string; alt: string; controls?: boolean
+function SlideMedia({ src, className, alt, controls, style }: {
+  src: string; className?: string; alt: string; controls?: boolean; style?: React.CSSProperties
 }) {
   if (isVideo(src)) {
     return (
@@ -96,11 +105,12 @@ function SlideMedia({ src, className, alt, controls }: {
         controls={controls}
         playsInline
         className={className}
+        style={style}
         aria-label={alt}
       />
     )
   }
-  return <img src={src} alt={alt} loading="lazy" className={className} />
+  return <img src={src} alt={alt} loading="lazy" className={className} style={style} />
 }
 
 export default function ExportsGallery({
@@ -255,7 +265,7 @@ export default function ExportsGallery({
               open?.slug === c.slug ? 'border-brand' : 'border-border hover:border-brand/50',
             )}
           >
-            <div className="relative aspect-[4/5] w-full overflow-hidden bg-secondary">
+            <div className="relative w-full overflow-hidden bg-secondary" style={{ aspectRatio: ratio(c.aspect) }}>
               <SlideMedia src={c.cover} alt={c.slug} className="h-full w-full object-cover" />
               <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-px text-[10px] font-bold text-white">
                 {c.slideCount}
@@ -456,7 +466,8 @@ export default function ExportsGallery({
             <SlideMedia
               src={s}
               alt={`slide ${i + 1}`}
-              className={cn('w-full object-cover', platform === 'default' ? 'aspect-[4/5]' : 'aspect-[9/16]')}
+              className="w-full object-cover"
+              style={{ aspectRatio: ratio(platform === 'default' ? open.aspect : open.variants?.[platform]?.aspect) }}
             />
             {isVideo(s) && (
               <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[9px] font-bold text-white">

@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import Anthropic from '@anthropic-ai/sdk'
-import { readFileSync, writeFileSync, unlinkSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs'
+import { readFileSync, writeFileSync, unlinkSync, existsSync, mkdirSync, readdirSync, statSync,
+         openSync, readSync, closeSync } from 'fs'
 import { join, resolve, sep } from 'path'
 import { homedir } from 'os'
 
@@ -377,7 +378,9 @@ function cleanMono(s: unknown): string {
 // JSON Schema the model's response is constrained to, so the reply is always
 // valid JSON in the right shape — no markdown fences to strip, no reshaping.
 function slidesSchema(slideCount: number, variant?: string) {
-  const terminal = variant === 'terminal'
+  // 'tall' is the terminal layout on a taller canvas, so it wants the same
+  // fields written the same way. Only the canvas differs.
+  const terminal = variant === 'terminal' || variant === 'tall'
   const props: Record<string, any> = {
     slideNumber:  { type: 'integer' },
     headline:     { type: 'string', description: terminal ? '1-3 words, lowercase, like a CLI subcommand' : '3-6 words, punchy and bold' },
@@ -501,10 +504,10 @@ Every slide needs real content written for its specific purpose — no placehold
       headline: ai.headline || '', emphasisLine: ai.emphasisLine || '', bodyText: ai.bodyText || '',
       bgColor: '#F5F0EB', textColor: '#1B1B1B', accentColor: '#E07355',
     }
-    if (framework.variant === 'terminal') {
+    if (framework.variant === 'terminal' || framework.variant === 'tall') {
       // Terminal frameworks bring their own palette and layout
       Object.assign(base, {
-        variant: 'terminal',
+        variant: framework.variant,
         bgColor: '#12141A', textColor: '#EEECE8', accentColor: '#E07355',
         terminalTitle: cleanMono(ai.terminalTitle) || undefined,
         terminalLines: (ai.terminalLines || []).map(cleanMono).filter(Boolean),
@@ -513,7 +516,9 @@ Every slide needs real content written for its specific purpose — no placehold
     return base
   })
   for (const s of merged) {
-    if (s.type === 'cta' && s.variant !== 'terminal') { s.bgColor = '#1B4332'; s.textColor = '#F5F0EB'; s.accentColor = '#E07355' }
+    // The green CTA palette belongs to the editorial layout. Both terminal
+    // variants keep the dark one they were just given.
+    if (s.type === 'cta' && s.variant !== 'terminal' && s.variant !== 'tall') { s.bgColor = '#1B4332'; s.textColor = '#F5F0EB'; s.accentColor = '#E07355' }
   }
 
   return { slides: merged, title: title ?? topic }
@@ -1041,6 +1046,31 @@ app.post('/api/check', async (c) => {
 
 // ── Platform variants ─────────────────────────────────────────────────────────
 
+/**
+ * PNG dimensions, read from the 24-byte IHDR header rather than the whole file.
+ *
+ * Nothing on disk records which variant an exported slide came from, so the
+ * only way to tell a 4:5 set from a 9:16 one is to measure a slide. Both the
+ * TikTok reframe and the exports gallery need that answer.
+ */
+function pngSize(path: string): { width: number; height: number } | null {
+  let fd: number | undefined
+  try {
+    fd = openSync(path, 'r')
+    const buf = Buffer.alloc(24)
+    if (readSync(fd, buf, 0, 24, 0) < 24) return null
+    if (buf.toString('ascii', 1, 4) !== 'PNG') return null
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) }
+  } catch {
+    return null
+  } finally {
+    if (fd !== undefined) closeSync(fd)
+  }
+}
+
+/** The frame a `tall` slide is drawn at, and what TikTok wants. */
+const TALL_W = 1080, TALL_H = 1920
+
 // Re-frame an exported carousel for TikTok: every slide is placed inside a
 // 1080x1920 canvas clear of TikTok's caption block, action rail and tab chrome.
 // Writes to <slug>/tiktok/ so the gallery picks it up as a variant.
@@ -1064,6 +1094,15 @@ app.post('/api/export-tiktok', async (c) => {
   const stillNumbers = new Set(stills.map((f) => f.match(/\d+/)![0]))
   if (!stills.length) return c.json({ error: 'No slide PNGs to reframe' }, 400)
 
+  // A `tall` carousel exports at 1080x1920 already, so there is nothing to
+  // reframe: tiktok_safe.py writes those through untouched (the decision lives
+  // there so the CLI behaves the same). Measured here only to say so in the
+  // response, since "reframed 7 slides" would be a lie about a tall set.
+  const passedThrough = stills.filter((name) => {
+    const size = pngSize(join(slugDir, name))
+    return !!size && size.width === TALL_W && size.height === TALL_H
+  })
+
   const outcomes = await Promise.all(stills.map(async (name) => {
     const payload = JSON.stringify({
       input: join(slugDir, name), output: join(outDir, name), bgColor, format,
@@ -1081,6 +1120,8 @@ app.post('/api/export-tiktok', async (c) => {
     ok: true,
     count: stills.length,
     outputDir: outDir,
+    // Already 9:16, copied through rather than scaled into a padded frame.
+    passedThrough,
     // A video slide reframed from its still: the set is complete, but that
     // slide is static on TikTok. Saying so beats implying the motion carried.
     staticFromVideo: videos.filter((v) => stillNumbers.has(v.match(/\d+/)![0])),
@@ -1265,10 +1306,17 @@ function readSlideSet(dir: string, urlPrefix: string) {
   let modified = 0
   try { modified = statSync(join(dir, slides[0])).mtimeMs } catch { /* ignore */ }
 
+  // Read off the cover, because the gallery cannot otherwise tell a tall set
+  // from a 4:5 one and a hardcoded 4:5 thumbnail box crops a third off every
+  // slide. Falls back to 4:5 when the cover is a video, which has no PNG header.
+  const size = pngSize(join(dir, slides[0]))
+  const aspect = size ? size.height / size.width : 1350 / 1080
+
   return {
     slideCount: slides.length,
     slides: slides.map((f) => `${urlPrefix}/${f}`),
     cover: `${urlPrefix}/${slides[0]}`,
+    aspect,
     files,
     modified,
   }
@@ -1296,7 +1344,7 @@ app.get('/api/exports', (c) => {
       } catch { /* ignore */ }
       for (const name of subdirs) {
         const set = readSlideSet(join(slugDir, name), `${base}/${encodeURIComponent(name)}`)
-        if (set) variants[name] = { slideCount: set.slideCount, slides: set.slides, cover: set.cover, modified: set.modified }
+        if (set) variants[name] = { slideCount: set.slideCount, slides: set.slides, cover: set.cover, aspect: set.aspect, modified: set.modified }
       }
 
       const pdf = root.files.find((f) => f.toLowerCase().endsWith('.pdf'))
@@ -1316,6 +1364,7 @@ app.get('/api/exports', (c) => {
         slideCount: root.slideCount,
         slides: root.slides,
         cover: root.cover,
+        aspect: root.aspect,
         pdf: pdf ? `${base}/${pdf}` : null,
         hasCaptions: root.files.includes('captions.md'),
         videos,

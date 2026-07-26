@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Slide } from '../types'
+import { Slide, SlideVariant } from '../types'
 import { cn } from '../lib/utils'
 
 /**
@@ -18,8 +18,10 @@ export interface Theme {
   bgColor: string
   textColor: string
   accentColor: string
-  /** Some themes imply a layout, not just a palette. */
-  variant?: 'default' | 'terminal'
+  /** Some themes imply a layout, not just a palette — and `tall` implies a
+   *  canvas size too. The union is the one in types.ts rather than a second
+   *  copy that goes stale the next time a variant is added. */
+  variant?: SlideVariant
   builtin?: boolean
 }
 
@@ -80,10 +82,13 @@ export default function ThemePicker({ slide, onApply }: Props) {
     setNaming(false)
   }
 
+  // Terminal and Terminal Tall share a palette and differ only in layout, so
+  // colours alone would light up both swatches at once.
   const matches = (t: Theme) =>
     t.bgColor.toLowerCase() === slide.bgColor.toLowerCase() &&
     t.textColor.toLowerCase() === slide.textColor.toLowerCase() &&
-    t.accentColor.toLowerCase() === slide.accentColor.toLowerCase()
+    t.accentColor.toLowerCase() === slide.accentColor.toLowerCase() &&
+    (t.variant ?? 'default') === (slide.variant ?? 'default')
 
   return (
     <div>

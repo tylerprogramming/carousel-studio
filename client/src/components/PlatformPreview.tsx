@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Slide } from '../types'
-import SlidePreview from './SlidePreview'
+import SlidePreview, { slideAspect, TALL_SAFE } from './SlidePreview'
 import { useSettings } from '../hooks/useSettings'
 import { cn } from '../lib/utils'
 import { TIKTOK_SAFE } from '../lib/tokens'
@@ -30,8 +30,8 @@ interface Props {
 }
 
 const PHONE_W     = 390
-const SLIDE_SCALE = PHONE_W / 1080
-const SLIDE_H     = Math.round(PHONE_W * 1350 / 1080)
+// No SLIDE_H constant: slide height is per slide now, since a tall slide is
+// 9:16 rather than 4:5. CarouselStrip works it out from the deck it is given.
 // TikTok: 9:16 aspect ratio phone screen height (matches Instagram phone's overall chrome height)
 const TT_VIDEO_H  = Math.round(PHONE_W * 16 / 9)
 const TT_MARGIN   = TIKTOK_SAFE.margin
@@ -83,15 +83,20 @@ function StatusBar({ dark = false }: { dark?: boolean }) {
 }
 
 // ── Carousel strip ─────────────────────────────────────────────────────────────
-function CarouselStrip({ slides, activeIndex, onMouseDown, onMouseUp, width = PHONE_W, height = SLIDE_H }: {
+function CarouselStrip({ slides, activeIndex, onMouseDown, onMouseUp, width = PHONE_W, height }: {
   slides: Slide[]; activeIndex: number
   onMouseDown: (e: React.MouseEvent) => void
   onMouseUp: (e: React.MouseEvent) => void
   width?: number; height?: number
 }) {
   const scale = width / 1080
+  // The strip is one box every slide swipes through, so it has to be as tall as
+  // the tallest slide in the deck. A 4:5 box clipped a tall slide's bottom
+  // third; sizing to the tallest leaves a shorter slide with space under it,
+  // which is the harmless half of the trade.
+  const boxH = height ?? Math.round(width * Math.max(...slides.map(slideAspect), 0))
   return (
-    <div style={{ width, height, overflow: 'hidden', cursor: 'grab', userSelect: 'none', position: 'relative' }}
+    <div style={{ width, height: boxH, overflow: 'hidden', cursor: 'grab', userSelect: 'none', position: 'relative' }}
       onMouseDown={onMouseDown} onMouseUp={onMouseUp}>
       <div style={{ display: 'flex', width: width * slides.length, transform: `translateX(-${activeIndex * width}px)`, transition: 'transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)' }}>
         {slides.map((sl) => (
@@ -274,13 +279,18 @@ function TikTokPhone({ slides, activeIndex, onIndexChange, showSafeArea }: Omit<
         {/* Inset the slide the way tiktok_safe.py does, on the slide's own
             background colour, so nothing sits under TikTok's overlays. The old
             behaviour scaled the 4:5 slide to fill 9:16, which cropped the sides
-            and showed a frame TikTok would never render. */}
+            and showed a frame TikTok would never render.
+
+            A `tall` slide is drawn at 9:16 in the first place and keeps its own
+            content clear of the overlays, so it fills the frame — insetting it
+            would pad a slide that needs no padding. */}
         {(() => {
-          const contentW = Math.round(PHONE_W * (1 - TT_MARGIN * 2))
-          const contentH = Math.round(contentW * 1350 / 1080)
-          const top      = Math.round((TT_VIDEO_H - contentH) * TT_TOP_BIAS)
+          const tall     = slides[activeIndex]?.variant === 'tall'
+          const contentW = tall ? PHONE_W : Math.round(PHONE_W * (1 - TT_MARGIN * 2))
+          const contentH = Math.round(contentW * slideAspect(slides[activeIndex] ?? {}))
+          const top      = tall ? 0 : Math.round((TT_VIDEO_H - contentH) * TT_TOP_BIAS)
           const pad      = slides[activeIndex]?.bgColor || '#12141A'
-          const left     = Math.round(PHONE_W * TT_MARGIN)
+          const left     = tall ? 0 : Math.round(PHONE_W * TT_MARGIN)
           return (
             <div style={{ position: 'absolute', inset: 0, background: pad }}>
               <div style={{ position: 'absolute', top, left }}>
@@ -295,15 +305,25 @@ function TikTokPhone({ slides, activeIndex, onIndexChange, showSafeArea }: Omit<
               </div>
               {/* The padding around the inset is the slide's own background
                   colour, so the inset is invisible on most slides. This outlines
-                  where the 4:5 art actually stops. */}
+                  where the 4:5 art actually stops.
+
+                  A tall slide fills the frame, so that outline would just trace
+                  the screen. What is worth seeing there is the other line: the
+                  keep-out box its text is laid out inside. */}
               {showSafeArea && (
                 <div style={{
-                  position: 'absolute', top, left, width: contentW, height: contentH,
-                  border: '1px dashed #fff', pointerEvents: 'none', zIndex: 15,
+                  position: 'absolute', pointerEvents: 'none', zIndex: 15,
+                  border: '1px dashed #fff',
                   // Difference blend rather than a fixed colour: slide
                   // backgrounds run from cream to near-black, and a white
                   // hairline vanished on every light one.
                   mixBlendMode: 'difference',
+                  ...(tall ? {
+                    top: Math.round(TT_VIDEO_H * TALL_SAFE.top / 1920),
+                    left: 0,
+                    right: Math.round(PHONE_W * TALL_SAFE.right / 1080),
+                    bottom: Math.round(TT_VIDEO_H * TALL_SAFE.bottom / 1920),
+                  } : { top, left, width: contentW, height: contentH }),
                 }} />
               )}
             </div>

@@ -9,8 +9,10 @@ move while the rest stay still. This composites:
   + the slide overlay  (generate_slide.py with transparent: true)
   + optional audio
 
-and writes 1080x1350 h264. Note this is NOT flash_video.py, which targets
-1080x1920 for standalone Reels.
+and writes h264 at the slide's own size. That is 1080x1350 for a normal slide
+and 1080x1920 for a `tall` one — the overlay is measured rather than assumed,
+because scaling a 9:16 overlay into a 4:5 frame squashes it silently. Note this
+is NOT flash_video.py, which targets 1080x1920 for standalone Reels.
 
 Usage: python3 slide_video.py '<json payload>'
 
@@ -33,6 +35,24 @@ W, H, FPS = 1080, 1350, 30
 VIDEO_EXT = {'.mp4', '.mov', '.m4v', '.webm', '.mkv'}
 
 
+def canvas_for(overlay: str):
+    """Frame size, taken from the overlay rather than assumed.
+
+    A `tall` slide's overlay is 1080x1920. Scaling that to a fixed 1080x1350
+    would squash it, and nothing downstream would say so — the clip just comes
+    out wrong. With no overlay there is nothing to measure, so the 4:5 default
+    stands.
+    """
+    if overlay and os.path.exists(overlay):
+        try:
+            from PIL import Image
+            with Image.open(overlay) as im:
+                return im.size
+        except Exception:
+            pass
+    return W, H
+
+
 def run(cmd):
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode != 0:
@@ -48,6 +68,7 @@ def build(cfg):
     zoom = float(cfg.get('zoom', 1.08))
     out = cfg['output']
     frames = max(1, int(round(dur * FPS)))
+    w, h = canvas_for(overlay)
 
     is_video = os.path.splitext(source)[1].lower() in VIDEO_EXT if source else False
 
@@ -58,7 +79,7 @@ def build(cfg):
         cmd += ['-loop', '1', '-t', f'{dur}', '-i', source]
     else:
         # No source: a flat colour bed, so the overlay still becomes a video
-        cmd += ['-f', 'lavfi', '-t', f'{dur}', '-i', f'color=c=black:s={W}x{H}:r={FPS}']
+        cmd += ['-f', 'lavfi', '-t', f'{dur}', '-i', f'color=c=black:s={w}x{h}:r={FPS}']
     if overlay:
         cmd += ['-i', overlay]
     if audio:
@@ -70,19 +91,19 @@ def build(cfg):
         # step is derived from the total zoom so the push is linear-ish.
         step = (zoom - 1.0) / frames
         bg = (
-            f"scale={W*4}:{H*4}:force_original_aspect_ratio=increase,"
-            f"crop={W*4}:{H*4},"
+            f"scale={w*4}:{h*4}:force_original_aspect_ratio=increase,"
+            f"crop={w*4}:{h*4},"
             f"zoompan=z='min(zoom+{step:.6f},{zoom})':d={frames}"
-            f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={W}x{H}:fps={FPS}"
+            f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={w}x{h}:fps={FPS}"
         )
     else:
         bg = (
-            f"scale={W}:{H}:force_original_aspect_ratio=increase,"
-            f"crop={W}:{H},fps={FPS}"
+            f"scale={w}:{h}:force_original_aspect_ratio=increase,"
+            f"crop={w}:{h},fps={FPS}"
         )
 
     if overlay:
-        fc = f"[0:v]{bg}[bg];[1:v]scale={W}:{H}[ov];[bg][ov]overlay=0:0:format=auto[v]"
+        fc = f"[0:v]{bg}[bg];[1:v]scale={w}:{h}[ov];[bg][ov]overlay=0:0:format=auto[v]"
     else:
         fc = f"[0:v]{bg}[v]"
     cmd += ['-filter_complex', fc, '-map', '[v]']

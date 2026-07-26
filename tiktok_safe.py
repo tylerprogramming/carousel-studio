@@ -11,6 +11,10 @@ places it inside a 1080x1920 canvas filled with the slide's own background
 colour, positioned to clear the overlays. Because it is a post-process, the
 generate_slide.py / SlidePreview.tsx twin contract is untouched.
 
+A slide that is already 1080x1920 — the `tall` variant, which draws at 9:16 in
+the first place — is written through unchanged rather than reframed. Nothing
+here needs to know what a variant is: the source size says it.
+
 Safe area (measured against TikTok's phone layout, tweak with the flags):
   right rail   ~150px      bottom UI  ~340px      top chrome  ~130px
 
@@ -49,23 +53,7 @@ def hex_to_rgb(value, fallback=(18, 20, 26)):
         return fallback
 
 
-def reframe(cfg):
-    src = Image.open(cfg['input']).convert('RGB')
-    bg = hex_to_rgb(cfg.get('bgColor'))
-    margin = int(cfg.get('margin', 110))
-    top_bias = float(cfg.get('topBias', 0.38))
-
-    content_w = OUT_W - margin * 2
-    scaled = src.resize((content_w, round(src.height * content_w / src.width)),
-                        Image.LANCZOS)
-
-    canvas = Image.new('RGB', (OUT_W, OUT_H), bg)
-    # top_bias < 0.5 pushes the slide up, leaving the larger gap at the bottom
-    # where TikTok's caption and username sit.
-    free = OUT_H - scaled.height
-    y = max(0, min(free, round(free * top_bias)))
-    canvas.paste(scaled, (margin, y))
-
+def write_out(canvas, cfg):
     out = cfg['output']
     fmt = str(cfg.get('format', 'png')).lower()
     if fmt in ('jpg', 'jpeg'):
@@ -78,6 +66,34 @@ def reframe(cfg):
     else:
         canvas.save(out, 'PNG')
     return out
+
+
+def reframe(cfg):
+    src = Image.open(cfg['input']).convert('RGB')
+    bg = hex_to_rgb(cfg.get('bgColor'))
+    margin = int(cfg.get('margin', 110))
+    top_bias = float(cfg.get('topBias', 0.38))
+
+    # A slide already drawn at 1080x1920 — the `tall` variant — is native 9:16
+    # and lays its own text out clear of TikTok's overlays. Scaling it down to
+    # sit inside a 1080x1920 canvas would shrink a frame that already fits and
+    # pad it on all four sides for nothing. Write it through instead; the format
+    # conversion still happens, which is the other half of this script's job.
+    if src.size == (OUT_W, OUT_H):
+        return write_out(src, cfg)
+
+    content_w = OUT_W - margin * 2
+    scaled = src.resize((content_w, round(src.height * content_w / src.width)),
+                        Image.LANCZOS)
+
+    canvas = Image.new('RGB', (OUT_W, OUT_H), bg)
+    # top_bias < 0.5 pushes the slide up, leaving the larger gap at the bottom
+    # where TikTok's caption and username sit.
+    free = OUT_H - scaled.height
+    y = max(0, min(free, round(free * top_bias)))
+    canvas.paste(scaled, (margin, y))
+
+    return write_out(canvas, cfg)
 
 
 def main():

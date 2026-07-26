@@ -19,9 +19,11 @@ provider you configure.
   the editor stays usable while images render.
 - **Exports what you see.** PNG, PDF, or an MP4 slide. The Python renderer is a
   deliberate mirror of the live preview, down to the line-box maths.
-- **Two layouts.** A standard editorial slide, and a `terminal` variant with a
-  real terminal window for command-line content.
-- **Reframes for TikTok**, clear of the caption block and action rail.
+- **Three layouts.** A standard editorial slide, a `terminal` variant with a
+  real terminal window for command-line content, and `tall` — that same
+  terminal design drawn native 9:16 for TikTok rather than padded to fit.
+- **Reframes for TikTok**, clear of the caption block and action rail. A `tall`
+  carousel skips the reframe: it is already 1080x1920.
 - Undo/redo, drag to reorder, shift-click any control to apply it to every
   slide, and an exports gallery.
 
@@ -107,9 +109,15 @@ The Python side reproduces the CSS layout model rather than approximating it:
 line boxes with half-leading, `object-fit: cover` cropping, and Inter selected
 on its variable weight axis.
 
+Every number that differs between the 4:5 terminal slide and its 9:16 `tall`
+twin lives in one table: `terminal_geometry()` in `generate_slide.py`, copied
+field for field as `terminalGeometry()` in `SlidePreview.tsx` and imported by
+`check_slides.py`. Adding a canvas means editing that table, not hunting
+literals.
+
 Similarly, `flash_video.py` (1080x1920, standalone Reels) and `slide_video.py`
-(1080x1350, a slide inside a carousel) are separate on purpose. Same idea,
-different aspect, different job.
+(a slide inside a carousel, at that slide's own size) are separate on purpose.
+Same idea, different job.
 
 ## Layout
 
@@ -117,7 +125,7 @@ different aspect, different job.
 server.ts              Hono API, port 3010
 generate_slide.py      Slide renderer + PDF combiner  -- twin of SlidePreview.tsx
 generate_bg_image.py   Kie.ai image generation
-slide_video.py         A carousel slide as 1080x1350 MP4
+slide_video.py         A carousel slide as MP4, at whatever size the slide is
 flash_video.py         A standalone 1080x1920 Reel
 tiktok_safe.py         Reframe a slide clear of TikTok's UI
 themes/                One JSON per theme

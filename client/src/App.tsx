@@ -8,7 +8,7 @@ import { cn } from './lib/utils'
 import SlideList from './components/SlideList'
 import Inspector from './components/Inspector'
 import SlideEditor from './components/SlideEditor'
-import SlidePreview from './components/SlidePreview'
+import SlidePreview, { slideAspect } from './components/SlidePreview'
 import PlatformPreview from './components/PlatformPreview'
 import GenerateModal from './components/GenerateModal'
 import SavedCarouselsDrawer from './components/SavedCarouselsDrawer'
@@ -653,7 +653,7 @@ export default function App() {
                       <div
                         key={slide.id}
                         onClick={() => handleSelect(i)}
-                        style={{ width: thumbW, height: Math.round((thumbW * 1350) / 1080) }}
+                        style={{ width: thumbW, height: Math.round(thumbW * slideAspect(slide)) }}
                         className={cn(
                           'relative shrink-0 cursor-pointer overflow-hidden rounded-[10px] border-2 transition-all',
                           i === activeIndex ? 'border-brand shadow-[0_0_0_3px_var(--blue-light)]' : 'border-border',
@@ -705,7 +705,7 @@ export default function App() {
                   </div>
                   <div
                     className="shrink-0 overflow-hidden rounded-lg shadow-modal"
-                    style={{ width: 190, height: Math.round((190 * 1350) / 1080) }}
+                    style={{ width: 190, height: Math.round(190 * slideAspect(activeSlide)) }}
                   >
                     <SlidePreview slide={activeSlide} scale={190 / 1080} totalSlides={config.slides.length} />
                   </div>

@@ -23,6 +23,21 @@ HEIGHT = 1350
 PAD = 80          # SlidePreview: PAD = s(80)
 FOOTER_PAD = 90   # SlidePreview: footer row paddingLeft/Right
 
+# ── Tall canvas ───────────────────────────────────────────────────────────────
+# TikTok is 1080x1920. tiktok_safe.py fits a finished 4:5 slide inside that
+# frame, which leaves roughly 44% of it as flat padding — that is arithmetic,
+# not a margin anyone can tune away. The `tall` variant draws the terminal
+# design at 1080x1920 instead, so the post is native rather than adapted.
+TALL_WIDTH = 1080
+TALL_HEIGHT = 1920
+
+# TikTok's own UI, in the frame's coordinates — the same measurements
+# tiktok_safe.py documents. They are keep-out zones, not padding: the
+# background still fills the whole frame, nothing readable sits under them.
+TALL_SAFE_TOP = 130       # status bar, and the Following / For You tabs
+TALL_SAFE_RIGHT = 150     # like / comment / share / sound rail
+TALL_SAFE_BOTTOM = 340    # caption block, username, bottom nav
+
 FONT_PATH = Path(__file__).parent / 'fonts' / 'Inter-Variable.ttf'
 
 # macOS fallbacks, used only when the vendored Inter is missing. Exports will
@@ -235,9 +250,54 @@ def load_mono(size: int) -> ImageFont.FreeTypeFont:
     return load_font(size, 400)
 
 
+def terminal_geometry(tall: bool) -> dict:
+    """Every number that differs between the 4:5 terminal slide and its 9:16
+    twin, in one table.
+
+    generate_terminal_slide walks it, check_slides.py imports it, and
+    SlidePreview.tsx keeps a copy as GEOMETRY. One table rather than three sets
+    of literals, because the twin contract is only as good as the number of
+    places a constant has to be edited by hand.
+
+    `floor` is the bottom of the usable frame. On a 4:5 slide that is the
+    canvas bottom; on a tall slide it is the top of TikTok's caption block.
+    Everything anchored to the bottom hangs off it, so the same offsets that
+    place the footer and the terminal window at 4:5 place them at 9:16.
+    """
+    if tall:
+        return {
+            'width': TALL_WIDTH,
+            'height': TALL_HEIGHT,
+            'padx': 84,
+            # Stop short of the action rail instead of running under it
+            'right': TALL_WIDTH - TALL_SAFE_RIGHT,
+            'rail_y': 160,     # below the status bar and the tab chrome
+            'top': 300,        # the headline gets the top third to itself
+            'win_top': 900,
+            'win_gap': 56,     # minimum air between the text above and the window
+            'body_top': 980,
+            'floor': TALL_HEIGHT - TALL_SAFE_BOTTOM,
+        }
+    return {
+        'width': WIDTH,
+        'height': HEIGHT,
+        'padx': 84,
+        'right': WIDTH - 84,
+        'rail_y': 74,
+        'top': 200,
+        'win_top': 700,
+        'win_gap': 40,
+        'body_top': 720,
+        'floor': HEIGHT,
+    }
+
+
 def generate_terminal_slide(data):
     """Terminal variant — the export-side twin of TerminalSlide in
-    SlidePreview.tsx. Change both together."""
+    SlidePreview.tsx. Change both together.
+
+    Draws `terminal` at 1080x1350 and `tall` at 1080x1920. Same design, two
+    canvases: the difference is entirely in terminal_geometry() above."""
     bg = hex_to_rgb(data.get('bgColor') or '#12141A')
     fg = hex_to_rgb(data.get('textColor') or '#EEECE8')
     ac = hex_to_rgb(data.get('accentColor') or '#E07355')
@@ -251,13 +311,18 @@ def generate_terminal_slide(data):
     def fs(px):
         return max(8, round(px * scale))
 
-    PADX = 84
+    g = terminal_geometry(data.get('variant') == 'tall')
+    W, H = g['width'], g['height']
+    PADX = g['padx']
+    RIGHT = g['right']          # right edge of the content column
+    AVAIL = RIGHT - PADX        # width text and the terminal window get
+    FLOOR = g['floor']          # bottom of the usable frame
     # `transparent` renders the slide furniture only, on alpha, so ffmpeg can
     # composite it over moving footage. The photo is skipped: the video is the
     # background in that mode.
     transparent = bool(data.get('transparent'))
-    img = (Image.new('RGBA', (WIDTH, HEIGHT), (0, 0, 0, 0)) if transparent
-           else Image.new('RGB', (WIDTH, HEIGHT), bg))
+    img = (Image.new('RGBA', (W, H), (0, 0, 0, 0)) if transparent
+           else Image.new('RGB', (W, H), bg))
 
     # Optional photo behind the terminal chrome. Cover-cropped like the CSS
     # `object-fit: cover` the preview uses, so framing matches the export.
@@ -279,7 +344,7 @@ def generate_terminal_slide(data):
             src = None
     has_photo = src is not None
     if has_photo:
-        img.paste(cover_crop(src, WIDTH, HEIGHT,
+        img.paste(cover_crop(src, W, H,
                              50 + float(data.get('bgPanX', 0) or 0) / 2,
                              50 + float(data.get('bgPanY', 0) or 0) / 2), (0, 0))
 
@@ -288,21 +353,21 @@ def generate_terminal_slide(data):
     # is the fraction of slide height the ramp covers.
     fade = float(data.get('bottomFade', 0) or 0)
     if fade > 0:
-        fade_h = max(1, min(HEIGHT, round(HEIGHT * fade)))
+        fade_h = max(1, min(H, round(H * fade)))
         ramp = Image.new('L', (1, fade_h))
         # Squared falloff — a linear ramp reads as a visible band, this does not
         ramp.putdata([int(255 * (i / max(1, fade_h - 1)) ** 2) for i in range(fade_h)])
-        mask = ramp.resize((WIDTH, fade_h))
+        mask = ramp.resize((W, fade_h))
         if transparent:
-            band = Image.new('RGBA', (WIDTH, fade_h), (*bg, 255))
+            band = Image.new('RGBA', (W, fade_h), (*bg, 255))
             band.putalpha(mask)
-            img.alpha_composite(band, (0, HEIGHT - fade_h))
+            img.alpha_composite(band, (0, H - fade_h))
         else:
-            img.paste(Image.new('RGB', (WIDTH, fade_h), bg), (0, HEIGHT - fade_h), mask)
+            img.paste(Image.new('RGB', (W, fade_h), bg), (0, H - fade_h), mask)
 
     d = ImageDraw.Draw(img)
 
-    d.rectangle([0, 0, WIDTH, 8], fill=ac)
+    d.rectangle([0, 0, W, 8], fill=ac)
 
     # Rail shows the bare username, footer shows it with the @ — both come from
     # settings.json via the server, so nothing personal is baked into the app.
@@ -311,11 +376,11 @@ def generate_terminal_slide(data):
         handle = '@' + handle
 
     rail = load_mono(26)
-    d.text((PADX, 74), handle[1:], font=rail, fill=dim)
+    d.text((PADX, g['rail_y']), handle[1:], font=rail, fill=dim)
     right = 'v1.0' if stype == 'cover' else f'{slide_num:02d} / {total:02d}'
-    d.text((WIDTH - PADX, 74), right, font=rail, fill=dim, anchor='rt')
+    d.text((RIGHT, g['rail_y']), right, font=rail, fill=dim, anchor='rt')
 
-    y = 200
+    y = g['top']
     step = data.get('stepNumber')
     if step is not None and stype == 'content':
         f_step = load_font(fs(48), 900)
@@ -328,7 +393,7 @@ def generate_terminal_slide(data):
     if headline:
         size = fs(118 if stype == 'cover' else 108)
         f_h = load_font(size, 800)
-        for ln in wrap_text(d, headline, f_h, WIDTH - PADX * 2):
+        for ln in wrap_text(d, headline, f_h, AVAIL):
             d.text((PADX, y), ln, font=f_h, fill=fg)
             y += round(size * 1.06)
         y += 20
@@ -338,7 +403,7 @@ def generate_terminal_slide(data):
         if stype == 'cover':
             # One pill per wrapped line, mirroring box-decoration-break: clone
             f_e = load_font(fs(50), 700)
-            avail = WIDTH - PADX * 2 - 40
+            avail = AVAIL - 40
             pill_h = fs(50) + 20
             for line in wrap_text(d, emphasis, f_e, avail):
                 tw = d.textbbox((0, 0), line, font=f_e)[2]
@@ -353,13 +418,12 @@ def generate_terminal_slide(data):
 
     lines = data.get('terminalLines') or []
     if lines:
-        win_top = 700
         f_line = load_mono(fs(29))
         line_h = round(fs(29) * 1.9)
         # Terminal lines wrap, matching whiteSpace: pre-wrap in SlidePreview.
         # Without this a long line was simply cut off at the window edge, which
         # only showed up once the type got bigger.
-        avail_w = (WIDTH - PADX * 2) - 60
+        avail_w = AVAIL - 60
         wrapped = []
         for raw in [mono_safe(l) for l in lines]:
             pieces = wrap_text(d, raw, f_line, avail_w) or ['']
@@ -369,17 +433,17 @@ def generate_terminal_slide(data):
             for extra in pieces[1:]:
                 wrapped.append(('  ' + extra, raw))
         win_h = 62 + 26 * 2 + line_h * len(wrapped)
-        # Wrapping makes the window taller, and at 700 it grew straight through
-        # the footer. Lift it so it always clears, with a floor so it cannot
-        # ride up into the headline.
+        # Wrapping makes the window taller, and at its preferred top it grew
+        # straight through the footer. Lift it so it always clears, with a
+        # floor so it cannot ride up into the headline.
         # Floor is where the text above actually ended, not a fixed number:
         # at a larger textScale the headline and emphasis take more room, and a
         # magic floor let the window ride up over them.
-        FOOTER_TOP = HEIGHT - 130
-        win_top = max(y + 40, min(win_top, FOOTER_TOP - win_h))
-        d.rounded_rectangle([PADX, win_top, WIDTH - PADX, win_top + win_h], radius=16, fill=(11, 13, 18))
-        d.rounded_rectangle([PADX, win_top, WIDTH - PADX, win_top + 62], radius=16, fill=(35, 39, 47))
-        d.rectangle([PADX, win_top + 40, WIDTH - PADX, win_top + 62], fill=(35, 39, 47))
+        FOOTER_TOP = FLOOR - 130
+        win_top = max(y + g['win_gap'], min(g['win_top'], FOOTER_TOP - win_h))
+        d.rounded_rectangle([PADX, win_top, RIGHT, win_top + win_h], radius=16, fill=(11, 13, 18))
+        d.rounded_rectangle([PADX, win_top, RIGHT, win_top + 62], radius=16, fill=(35, 39, 47))
+        d.rectangle([PADX, win_top + 40, RIGHT, win_top + 62], fill=(35, 39, 47))
         for i, c in enumerate([(255, 95, 86), (255, 189, 46), (39, 201, 63)]):
             cx = PADX + 24 + i * 25
             d.ellipse([cx, win_top + 23, cx + 15, win_top + 38], fill=c)
@@ -393,7 +457,7 @@ def generate_terminal_slide(data):
             ly += line_h
     if (data.get('bodyText') or '').strip():
         body_font = load_mono(fs(32))
-        body_lines = wrap_text(d, data['bodyText'].strip(), body_font, WIDTH - PADX * 2)
+        body_lines = wrap_text(d, data['bodyText'].strip(), body_font, AVAIL)
         n_lines = len(body_lines)
         line_adv = round(fs(32) * 1.65)
         if lines:
@@ -401,20 +465,20 @@ def generate_terminal_slide(data):
             # A short block leaves most of the slide empty otherwise.
             by = win_top + win_h + 46
         elif has_photo:
-            # At 720 the copy lands on the brightest part of the photo.
-            # Drop it into the faded zone above the footer instead.
-            by = HEIGHT - 150 - n_lines * line_adv
+            # At its usual top the copy lands on the brightest part of the
+            # photo. Drop it into the faded zone above the footer instead.
+            by = FLOOR - 150 - n_lines * line_adv
         else:
-            by = 720
+            by = g['body_top']
         body_fill = hex_to_rgb(data['bodyTextColor']) if data.get('bodyTextColor') else fg
         for ln in body_lines:
             d.text((PADX, by), ln, font=body_font, fill=body_fill)
             by += line_adv
 
     foot = load_mono(26)
-    d.text((PADX, HEIGHT - 64), handle, font=foot, fill=dim)
+    d.text((PADX, FLOOR - 64), handle, font=foot, fill=dim)
     if slide_num < total:
-        d.text((WIDTH - PADX, HEIGHT - 64), 'swipe →', font=foot, fill=ac, anchor='rt')
+        d.text((RIGHT, FLOOR - 64), 'swipe →', font=foot, fill=ac, anchor='rt')
 
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     img.save(out, 'PNG')
@@ -422,7 +486,8 @@ def generate_terminal_slide(data):
 
 
 def generate_slide(data):
-    if data.get('variant') == 'terminal':
+    # Both terminal variants are the same drawing at two canvas sizes
+    if data.get('variant') in ('terminal', 'tall'):
         return generate_terminal_slide(data)
     bg_rgb = hex_to_rgb(data.get('bgColor', '#F5F0EB'))
     text_rgb = hex_to_rgb(data.get('textColor', '#1B1B1B'))

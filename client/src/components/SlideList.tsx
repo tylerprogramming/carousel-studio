@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Slide } from '../types'
-import SlidePreview from './SlidePreview'
+import SlidePreview, { slideAspect } from './SlidePreview'
 import { CopyIcon, GripIcon } from './icons'
 import { cn } from '../lib/utils'
 import { Finding, sortFindings, worstLevel } from '../hooks/useSlideCheck'
@@ -18,7 +18,9 @@ interface Props {
 }
 
 const THUMB_W = 148
-const THUMB_H = Math.round((THUMB_W * 1350) / 1080)
+// Height per slide, not a constant: a tall slide is 9:16 and a fixed 4:5 box
+// cropped its bottom third, hiding the footer and half the terminal window.
+const thumbH = (slide: Slide) => Math.round(THUMB_W * slideAspect(slide))
 
 export default function SlideList({
   slides, activeIndex, onSelect, onAdd, onRemove, onReorder, onDuplicate, findingsFor,
@@ -58,7 +60,7 @@ export default function SlideList({
               onDragOver={(e) => { e.preventDefault(); setOverIndex(i) }}
               onDrop={(e) => { e.preventDefault(); handleDrop(i) }}
               onClick={() => onSelect(i)}
-              style={{ width: THUMB_W, height: THUMB_H }}
+              style={{ width: THUMB_W, height: thumbH(slide) }}
               className={cn(
                 'group relative shrink-0 cursor-pointer overflow-hidden rounded-[9px] border-2 transition-all',
                 i === activeIndex
