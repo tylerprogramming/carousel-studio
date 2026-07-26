@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.1.6
+
+**A native 9:16 slide, instead of a 4:5 one padded to fit.** Slides are drawn
+1080x1350; TikTok is 1080x1920. `tiktok_safe.py` adapted a finished slide by
+insetting it, which left about 44% of the frame as flat background — 147px
+above and 241px below on a 495x880 preview. That is arithmetic, not something
+margin tuning fixes.
+
+The `tall` variant is the same terminal design drawn at 1080x1920, chosen
+through `themes/terminal-tall.json` like any other theme. A `tall` carousel
+skips the TikTok reframe, because it is already the right shape.
+
+Every number that differs between the two canvases lives in one table:
+`terminal_geometry()` in `generate_slide.py`, mirrored as `terminalGeometry()`
+in `SlidePreview.tsx` and imported by `check_slides.py`. Those constants used
+to be duplicated literals in all three, which is fine with one canvas and
+silently wrong with two.
+
+Existing 4:5 carousels are untouched — verified byte-identical against a
+shipped slide, with the checker still reporting the same findings across all
+nine.
+
 ## 2.1.5
 
 **One editor, one preview.** Choosing TikTok used to swap the whole desktop
