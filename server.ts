@@ -807,6 +807,17 @@ app.post('/api/export-all', async (c) => {
   mkdirSync(slugDir, { recursive: true })
   const scriptPath = join(import.meta.dir, 'generate_slide.py')
 
+  // Run the check first and hand the findings back with the result. It does
+  // not block: a warning should not stop an export, and an error is usually
+  // something you want to see rendered before you fix it.
+  let check: any = null
+  try {
+    const cp = Bun.spawn(['python3', join(import.meta.dir, 'check_slides.py'),
+                          JSON.stringify({ slides })], { stdout: 'pipe', stderr: 'ignore' })
+    const [cc, co] = await Promise.all([cp.exited, new Response(cp.stdout).text()])
+    if (cc === 0) check = JSON.parse(co)
+  } catch { /* a broken check must never stop an export */ }
+
   // Step 1: always generate PNGs — rendered in parallel, one python process per slide
   type Render = { slide: any; filename: string; outputPath: string; payload: string }
   const handle = creatorHandle()   // invariant across the batch
@@ -870,6 +881,7 @@ app.post('/api/export-all', async (c) => {
     pdf: pdfResult,
     slug,
     outputDir: slugDir,
+    check,
   })
 })
 
@@ -971,6 +983,22 @@ app.post('/api/summary-slide', async (c) => {
       ? 'No audio bed configured. Drop a track in audio/ and set audioPath, or let TikTok add one at post time.'
       : undefined,
   })
+})
+
+// What is wrong with this carousel before you export it. Measures with the
+// same fonts and geometry as the renderer, so a finding here is a finding in
+// the export rather than an approximation.
+app.post('/api/check', async (c) => {
+  const { slides, strict = false } = await c.req.json()
+  if (!Array.isArray(slides)) return c.json({ error: 'slides array is required' }, 400)
+  const proc = Bun.spawn(['python3', join(import.meta.dir, 'check_slides.py'),
+                          JSON.stringify({ slides, strict })],
+                         { stdout: 'pipe', stderr: 'pipe' })
+  const [code, out, err] = await Promise.all([
+    proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text(),
+  ])
+  if (code !== 0) return c.json({ error: `check failed: ${err}` }, 500)
+  try { return c.json(JSON.parse(out)) } catch { return c.json({ error: `bad check output: ${out}` }, 500) }
 })
 
 // ── Platform variants ─────────────────────────────────────────────────────────
