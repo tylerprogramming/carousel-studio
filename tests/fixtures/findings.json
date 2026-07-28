@@ -1,0 +1,161 @@
+{
+  "_comment": [
+    "One slide per finding check_slides.py can raise, with the exact set of",
+    "codes it must produce.",
+    "",
+    "`expect` is an exact set, not a subset. A checker that starts emitting an",
+    "extra finding on a slide is the false-positive regression these tests",
+    "exist to catch, so 'it still reports the one I asked about' is not a",
+    "strong enough assertion.",
+    "",
+    "Every fixture is built to trip its check by a wide margin rather than by a",
+    "pixel, so the tests do not go red on a font-metrics change that is not a",
+    "real regression.",
+    "",
+    "Shared palette is the clean deck's, so nothing here trips a contrast",
+    "check by accident except the two fixtures that mean to."
+  ],
+  "cases": [
+    {
+      "name": "empty headline",
+      "expect": ["empty_headline"],
+      "slide": {
+        "slideNumber": 1, "type": "content", "variant": "terminal",
+        "headline": "   ",
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "headline is one unbreakable word wider than the slide",
+      "expect": ["headline_overflow"],
+      "slide": {
+        "slideNumber": 1, "type": "content", "variant": "terminal",
+        "headline": "Supercalifragilisticexpialidocious",
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "headline wraps past three lines",
+      "expect": ["headline_tall"],
+      "slide": {
+        "slideNumber": 1, "type": "content", "variant": "terminal",
+        "headline": "This headline keeps going well past the point where it still reads as a headline at all",
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "cover emphasis is one unbreakable word wider than the pill",
+      "expect": ["emphasis_overflow"],
+      "slide": {
+        "slideNumber": 1, "type": "cover", "variant": "terminal",
+        "headline": "Short enough",
+        "emphasisLine": "Pneumonoultramicroscopicsilicovolcanoconiosisandthensome",
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "cover emphasis stacks into a paragraph",
+      "expect": ["emphasis_tall"],
+      "slide": {
+        "slideNumber": 1, "type": "cover", "variant": "terminal",
+        "headline": "Short enough",
+        "emphasisLine": "An emphasis line long enough that it stops being a line and becomes three stacked blocks of prose instead",
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "content emphasis is wider than the slide and does not wrap",
+      "expect": ["emphasis_wraps"],
+      "slide": {
+        "slideNumber": 1, "type": "content", "variant": "terminal",
+        "headline": "Short enough",
+        "emphasisLine": "This emphasis line is far too wide for a content slide to hold on one line",
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "a terminal command splits three ways",
+      "expect": ["terminal_line_wraps"],
+      "slide": {
+        "slideNumber": 1, "type": "content", "variant": "terminal",
+        "headline": "Short enough",
+        "terminalLines": [
+          "$ hyperframes render --input ./clips/raw/interview-final-v3.mp4 --output ./out/interview.mp4 --preset vertical --captions burned --silence-trim aggressive"
+        ],
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "terminal window is taller than the gap it has to fit in",
+      "expect": ["terminal_overflows_footer"],
+      "slide": {
+        "slideNumber": 1, "type": "content", "variant": "terminal",
+        "headline": "Short enough",
+        "terminalLines": [
+          "$ one", "$ two", "$ three", "$ four", "$ five", "$ six", "$ seven",
+          "$ eight", "$ nine", "$ ten", "$ eleven", "$ twelve", "$ thirteen",
+          "$ fourteen", "$ fifteen", "$ sixteen", "$ seventeen", "$ eighteen",
+          "$ nineteen", "$ twenty"
+        ],
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "body copy runs into the footer",
+      "expect": ["body_overflows_footer"],
+      "slide": {
+        "slideNumber": 1, "type": "content", "variant": "terminal",
+        "headline": "Short enough",
+        "bodyText": "Silence removal runs on the transcript rather than the waveform, which means it never clips the leading consonant off a word the way a gate does. It also means the cut list is inspectable before you commit to it, so a bad threshold is something you notice while reading rather than something you notice after the render. The transcript is the artifact everything else in the pipeline hangs off, so it is worth the extra pass to get it right the first time rather than discovering it downstream.",
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "text is barely visible against its background",
+      "expect": ["low_contrast_text"],
+      "slide": {
+        "slideNumber": 1, "type": "content", "variant": "terminal",
+        "headline": "Short enough",
+        "bgColor": "#12141A", "textColor": "#2A2E38", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "accent is treated as a text colour, not a block background",
+      "expect": ["low_contrast_emphasis"],
+      "slide": {
+        "slideNumber": 1, "type": "cover", "variant": "terminal",
+        "headline": "Short enough",
+        "emphasisLine": "Barely there",
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#1E2029"
+      }
+    },
+    {
+      "name": "photo with no fade under the footer",
+      "expect": ["photo_without_fade"],
+      "slide": {
+        "slideNumber": 1, "type": "content", "variant": "terminal",
+        "headline": "Short enough",
+        "backgroundImage": "images/does-not-need-to-exist.png",
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "CTA slide with no visible ask",
+      "expect": ["cta_without_ask"],
+      "slide": {
+        "slideNumber": 1, "type": "cta", "variant": "terminal",
+        "headline": "Short enough",
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    },
+    {
+      "name": "a standard slide is checked but its terminal-only rules are not",
+      "expect": [],
+      "slide": {
+        "slideNumber": 1, "type": "content", "variant": "standard",
+        "headline": "Standard slides skip every terminal check below the contrast pair, so this long body copy is not an overflow finding on this variant even though the same text would be on a terminal slide. Silence removal runs on the transcript rather than the waveform, which means it never clips the leading consonant off a word the way a gate does, and the cut list stays inspectable before you commit to it.",
+        "bgColor": "#12141A", "textColor": "#EEECE8", "accentColor": "#E07355"
+      }
+    }
+  ]
+}

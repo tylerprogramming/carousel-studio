@@ -9,6 +9,7 @@ provider you configure.
 ![Version](https://img.shields.io/badge/version-2.1.6-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Bun](https://img.shields.io/badge/runtime-Bun-black)
+[![CI](https://github.com/tylerprogramming/carousel-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/tylerprogramming/carousel-studio/actions/workflows/ci.yml)
 
 ## What it does
 
@@ -43,6 +44,8 @@ bun run dev               # http://localhost:5175
 ```
 
 Production: `bun run build && bun run start`, then http://localhost:3010.
+
+Tests: `bun run test`. Typecheck: `bun run typecheck`. Both run in CI.
 
 ### Keys
 
@@ -111,9 +114,13 @@ on its variable weight axis.
 
 Every number that differs between the 4:5 terminal slide and its 9:16 `tall`
 twin lives in one table: `terminal_geometry()` in `generate_slide.py`, copied
-field for field as `terminalGeometry()` in `SlidePreview.tsx` and imported by
-`check_slides.py`. Adding a canvas means editing that table, not hunting
-literals.
+field for field as `terminalGeometry()` in `client/src/lib/geometry.ts` and
+imported by `check_slides.py`. Adding a canvas means editing that table, not
+hunting literals.
+
+`bun test tests/` enforces this rather than trusting it — the two tables are
+diffed field for field on every run, so drift fails instead of shipping. See
+[`tests/README.md`](tests/README.md).
 
 Similarly, `flash_video.py` (1080x1920, standalone Reels) and `slide_video.py`
 (a slide inside a carousel, at that slide's own size) are separate on purpose.
@@ -124,6 +131,7 @@ Same idea, different job.
 ```
 server.ts              Hono API, port 3010
 generate_slide.py      Slide renderer + PDF combiner  -- twin of SlidePreview.tsx
+tests/                 Parity, checker and golden-render tests. See tests/README.md
 generate_bg_image.py   Kie.ai image generation
 slide_video.py         A carousel slide as MP4, at whatever size the slide is
 flash_video.py         A standalone 1080x1920 Reel

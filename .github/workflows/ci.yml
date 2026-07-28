@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: typecheck + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Pillow is pinned exactly, because the golden tests compare rendered
+      # pixels and a different FreeType rasterizes text differently.
+      - run: pip install -r requirements.txt
+
+      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile
+        working-directory: client
+
+      # First, because a type error would make the test failures below noise.
+      - run: bun run typecheck
+
+      # tests/ covers three things, and they fail for different reasons:
+      #   geometry-parity  the Python and TypeScript geometry tables have drifted
+      #   check-slides     the checker gained a false positive, or lost a check
+      #   golden           the exported PNGs changed
+      - run: bun test tests/
+
+      # Only fires when a golden failed. Without it the log says the pixels
+      # moved and gives you no way to see how.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: golden-diff
+          path: tests/fixtures/golden/_failed/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  python:
+    name: renderer on Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor someone might already have, and the current release.
+        python-version: ['3.9', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -r requirements.txt
+
+      # The Python layer is stdlib plus Pillow and is spawned by the server one
+      # script at a time, so an import-time break on someone's Python shows up
+      # as a failed export with a stack trace in a toast. Cheap to rule out.
+      - name: every script imports
+        run: |
+          python3 - <<'PY'
+          import importlib.util, pathlib, sys
+          failed = []
+          for f in sorted(pathlib.Path('.').glob('*.py')):
+              spec = importlib.util.spec_from_file_location(f.stem, f)
+              try:
+                  spec.loader.exec_module(importlib.util.module_from_spec(spec))
+              except Exception as exc:
+                  failed.append(f'{f}: {type(exc).__name__}: {exc}')
+          for line in failed:
+              print(f'::error::{line}')
+          sys.exit(1 if failed else 0)
+          PY
+
+      - name: the fixture deck still checks clean
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, sys
+          slides = json.load(open('tests/fixtures/clean-deck.json'))['slides']
+          proc = subprocess.run(
+              ['python3', 'check_slides.py', json.dumps({'slides': slides})],
+              capture_output=True, text=True)
+          print(proc.stdout or proc.stderr)
+          findings = json.loads(proc.stdout)['findings']
+          for f in findings:
+              print(f"::error::slide {f['slide']}: {f['code']}: {f['message']}")
+          sys.exit(1 if findings else 0)
+          PY
