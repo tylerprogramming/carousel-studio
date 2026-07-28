@@ -6,7 +6,7 @@ you control the design, and the export matches what you saw on screen.
 Runs locally. Bring your own API keys — nothing goes anywhere except the model
 provider you configure.
 
-![Version](https://img.shields.io/badge/version-2.1.6-blue)
+![Version](https://img.shields.io/badge/version-2.1.7-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Bun](https://img.shields.io/badge/runtime-Bun-black)
 [![CI](https://github.com/tylerprogramming/carousel-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/tylerprogramming/carousel-studio/actions/workflows/ci.yml)

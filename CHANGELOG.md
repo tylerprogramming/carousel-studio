@@ -1,5 +1,44 @@
 # Changelog
 
+## 2.1.7
+
+**The terminal variant exported in a sans face on Linux and Windows.**
+`MONO_FONTS` held two paths, both under `/System/Library/Fonts`. On any other
+OS neither exists, `load_mono()` fell through to `load_font()`, and that is
+Inter — proportional. So the terminal window, whose whole point is looking like
+a terminal, drew commands in a sans face. The preview did not, because its CSS
+ended in the generic `monospace` keyword, which a browser resolves to a real
+mono. Preview and export disagreed on every non-Mac machine.
+
+It had a second symptom: `check_slides.py` measures with `load_mono()` too, so
+the checker's answers depended on which machine ran it. The same slide reported
+clean on Linux and overflowing on macOS.
+
+JetBrains Mono is vendored (SIL OFL 1.1) as the last entry rather than the
+first. Menlo still wins on macOS, so existing decks render byte-identically —
+verified by regenerating the reference images and finding that not one PNG was
+rewritten. `SlidePreview` mirrors the same order and loads the same face, so
+the preview shows the font the exporter will use.
+
+**Tests and CI**, which is how the above was found. Three suites: the geometry
+tables in `generate_slide.py` and `client/src/lib/geometry.ts` are diffed field
+for field, so the parity contract fails instead of drifting; `check_slides.py`
+runs against fixtures with known findings, including a deck that must come back
+completely clean; and the exporter is compared to committed renders. Thresholds
+for that last one were measured rather than guessed — rendering is exactly
+deterministic, and the quietest regression worth catching still moves about
+0.1% of the frame.
+
+`typecheck` never ran. The repo root had no `tsconfig.json`, so `tsc --noEmit`
+printed its help and exited 1, and the `&&` meant the client half was never
+reached either.
+
+**Upgrading:** `requirements.txt` now pins Pillow exactly at 11.3.0 rather than
+flooring it at 10. The reference renders are compared pixel by pixel and Pillow
+ships its own FreeType, so a different version rasterizes text differently. If
+you share a Python environment with something else that wants Pillow 10, this
+is the one change here that will notice.
+
 ## 2.1.6
 
 **A native 9:16 slide, instead of a 4:5 one padded to fit.** Slides are drawn
