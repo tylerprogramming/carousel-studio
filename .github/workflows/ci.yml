@@ -21,8 +21,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Pillow is pinned exactly, because the golden tests compare rendered
-      # pixels and a different FreeType rasterizes text differently.
       - run: pip install -r requirements.txt
 
       - run: bun install --frozen-lockfile
@@ -32,11 +30,50 @@ jobs:
       # First, because a type error would make the test failures below noise.
       - run: bun run typecheck
 
-      # tests/ covers three things, and they fail for different reasons:
-      #   geometry-parity  the Python and TypeScript geometry tables have drifted
-      #   check-slides     the checker gained a false positive, or lost a check
-      #   golden           the exported PNGs changed
+      # Geometry parity and the checker fixtures are platform-independent and
+      # run here. The goldens are not — they were rendered against macOS's Menlo
+      # — so they skip themselves on this runner and run in the `golden` job
+      # below instead. The skip prints its reason; it is not silent.
       - run: bun test tests/
+
+  golden:
+    name: golden renders
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+
+      # Run the comparison directly rather than through bun: this job exists
+      # only to render pixels, and the assertion it needs — that the suite did
+      # not quietly skip — is easier to make here than to infer from test output.
+      - name: renders match the committed goldens
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, sys
+          out = subprocess.run(['python3', 'tests/golden.py', 'compare'],
+                               capture_output=True, text=True)
+          report = json.loads(out.stdout or '{}')
+          print(json.dumps(report, indent=2))
+
+          # A skip on the one runner chosen to run these is the failure mode
+          # that would quietly delete this job's coverage while still showing
+          # a green tick.
+          if report.get('skipped'):
+              print(f"::error::goldens skipped on the runner meant to run them: "
+                    f"{report.get('reason')}")
+              sys.exit(1)
+          if report.get('error'):
+              print(f"::error::{report['error']}")
+              sys.exit(1)
+          for slide in report.get('slides', []):
+              if slide['status'] != 'ok':
+                  print(f"::error::{slide['name']}: {slide['status']} "
+                        f"(soft {slide['soft']}, hard {slide['hard']})")
+          sys.exit(0 if report.get('ok') else 1)
+          PY
 
       # Only fires when a golden failed. Without it the log says the pixels
       # moved and gives you no way to see how.
@@ -80,6 +117,25 @@ jobs:
           for line in failed:
               print(f'::error::{line}')
           sys.exit(1 if failed else 0)
+          PY
+
+      # This is a regression test for a real bug, not a smoke check. MONO_FONTS
+      # held only macOS system paths, so on Linux load_mono() fell through to
+      # load_font() — Inter, which is proportional — and the terminal variant
+      # exported in a sans face while the preview still showed monospace.
+      - name: the terminal variant gets a real monospace font
+        run: |
+          python3 - <<'PY'
+          import sys
+          import generate_slide as g
+          family = g.load_mono(29).getname()[0]
+          print('load_mono resolves to:', family)
+          if family == 'Inter':
+              print('::error::load_mono() fell through to Inter. The terminal '
+                    'variant would export in a proportional font on this OS '
+                    'while the preview shows monospace. Vendor a mono font in '
+                    'MONO_FONTS.')
+              sys.exit(1)
           PY
 
       - name: the fixture deck still checks clean
