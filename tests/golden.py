@@ -44,18 +44,21 @@ confirm the slides still read correctly, then run `update`.
 """
 
 import json
+import platform
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
+import PIL
 from PIL import Image, ImageChops
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / 'tests' / 'fixtures'
 GOLDEN = FIXTURES / 'golden'
 DECK = FIXTURES / 'clean-deck.json'
+MANIFEST = GOLDEN / 'manifest.json'
 
 SOFT, HARD = 8, 64          # per-channel difference, 0-255
 MAX_SOFT_RATIO = 0.0005     # a handful of glyph edges, ~5x under the quietest regression
@@ -65,6 +68,24 @@ MAX_HARD_RATIO = 0.0002     # ~290px on a 4:5 slide, against 1270 for one extra 
 # A golden test that only says "the pixels moved" makes you go and reproduce it
 # by hand, which is the point at which people stop running it. Gitignored.
 FAILED = GOLDEN / '_failed'
+
+
+def provenance() -> dict:
+    """What these renders depend on, beyond the code.
+
+    A golden is only meaningful against the same font and the same rasterizer.
+    Recording that turns two different failures into two different messages:
+    "you are on a platform these were not made on" is a skip, and "you are on
+    the right platform but something underneath moved" is a real failure worth
+    looking at. Without it both arrive as an unexplained pixel diff.
+    """
+    sys.path.insert(0, str(ROOT))
+    import generate_slide as g
+    return {
+        'platform': platform.system().lower(),
+        'pillow': PIL.__version__,
+        'mono': g.load_mono(29).getname()[0],
+    }
 
 
 def render(slides, into: Path) -> dict:
@@ -132,6 +153,29 @@ def compare() -> dict:
     if not GOLDEN.exists():
         return {'ok': False, 'error': f'no goldens at {GOLDEN}. Run: python3 tests/golden.py update'}
 
+    now = provenance()
+    was = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else None
+    if was:
+        # A different OS resolves a different mono font, so these renders cannot
+        # be reproduced here. That is not a regression and must not read as one:
+        # a test that fails for a reason the reader cannot act on is a test that
+        # gets muted.
+        if was.get('platform') != now['platform']:
+            return {'ok': True, 'skipped': True, 'expected': was, 'actual': now,
+                    'reason': f"goldens were rendered on {was.get('platform')}, "
+                              f"this is {now['platform']}"}
+        # Same OS, but something underneath moved. That does change the PNGs you
+        # post, so it is a failure — and naming it beats an unexplained diff.
+        drifted = [k for k in ('pillow', 'mono') if was.get(k) != now[k]]
+        if drifted:
+            return {'ok': False, 'expected': was, 'actual': now,
+                    'error': 'the goldens were rendered with ' +
+                             ', '.join(f'{k} {was.get(k)}' for k in drifted) +
+                             ', this run has ' +
+                             ', '.join(f'{k} {now[k]}' for k in drifted) +
+                             '. That changes exported slides. Check them, then: '
+                             'bun run test:golden:update'}
+
     shutil.rmtree(FAILED, ignore_errors=True)   # last run's artifacts are not this run's
     tmp = Path(tempfile.mkdtemp(prefix='golden-'))
     try:
@@ -150,6 +194,7 @@ def compare() -> dict:
             results.append({'name': orphan, 'status': 'orphan_golden', 'soft': 0, 'hard': 0})
 
         return {'ok': all(r['status'] == 'ok' for r in results),
+                'rendered_with': now,
                 'thresholds': {'soft': MAX_SOFT_RATIO, 'hard': MAX_HARD_RATIO},
                 'slides': results}
     finally:
@@ -158,10 +203,12 @@ def compare() -> dict:
 
 def update() -> dict:
     slides = json.loads(DECK.read_text())['slides']
+    now = provenance()
     if GOLDEN.exists():
         shutil.rmtree(GOLDEN)
     written = render(slides, GOLDEN)
-    return {'ok': True, 'wrote': sorted(written)}
+    MANIFEST.write_text(json.dumps(now, indent=2) + '\n')
+    return {'ok': True, 'rendered_with': now, 'wrote': sorted(written)}
 
 
 if __name__ == '__main__':

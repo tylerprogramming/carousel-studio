@@ -227,7 +227,23 @@ def zoom_crop(img, box_w, box_h, zoom, pan_x, pan_y):
 
 # ── Renderer ──────────────────────────────────────────────────────────────────
 
-MONO_FONTS = ['/System/Library/Fonts/Menlo.ttc', '/System/Library/Fonts/Monaco.ttf']
+# The terminal variant's whole identity is that it looks like a terminal, so
+# the mono face is not optional. These two are macOS system paths and this list
+# used to end there — on any other OS load_mono() fell through to load_font(),
+# which is Inter, which is proportional. The terminal window rendered in a sans
+# face while the preview's CSS `monospace` keyword still resolved to a real
+# mono, so the preview and the export disagreed on every non-Mac machine.
+#
+# CI on Linux found that on its first run. JetBrains Mono is vendored as the
+# floor so the list can never run out.
+#
+# Menlo stays first deliberately: existing decks keep rendering exactly as they
+# always have on macOS. The order here is mirrored by MONO in SlidePreview.tsx.
+MONO_FONTS = [
+    '/System/Library/Fonts/Menlo.ttc',
+    '/System/Library/Fonts/Monaco.ttf',
+    str(Path(__file__).parent / 'fonts' / 'JetBrainsMono-Regular.ttf'),
+]
 
 # Anything outside this set renders as a tofu box in a mono face. The server
 # already scrubs generated text; this is the last line of defence for hand-typed

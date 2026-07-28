@@ -51,7 +51,10 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
   const FG = slide.textColor || '#EEECE8'
   const AC = slide.accentColor || '#E07355'
   const DIM = 'rgba(238,236,232,0.45)'
-  const MONO = "'Menlo','SFMono-Regular',ui-monospace,monospace"
+  // Mirrors MONO_FONTS in generate_slide.py, in the same order: Menlo on macOS,
+  // JetBrains Mono everywhere else. Leaving it at the bare `monospace` keyword
+  // meant the browser picked one font and the exporter picked another.
+  const MONO = "'Menlo','SFMono-Regular','JetBrains Mono',ui-monospace,monospace"
 
   const g = terminalGeometry(slide.variant === 'tall')
   const W = s(g.width), H = s(g.height), PAD = s(g.padx)

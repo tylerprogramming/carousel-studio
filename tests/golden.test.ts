@@ -16,15 +16,43 @@ import { ROOT } from './helpers'
  */
 
 interface SlideResult { name: string; status: string; soft: number; hard: number; peak?: number }
-interface Report { ok: boolean; error?: string; thresholds?: object; slides?: SlideResult[] }
+interface Provenance { platform: string; pillow: string; mono: string }
+interface Report {
+  ok: boolean
+  error?: string
+  skipped?: boolean
+  reason?: string
+  expected?: Provenance
+  actual?: Provenance
+  thresholds?: object
+  slides?: SlideResult[]
+}
 
 const proc = spawnSync(['python3', join(ROOT, 'tests', 'golden.py'), 'compare'], { cwd: ROOT })
 const report: Report = JSON.parse(proc.stdout.toString() || '{}')
 
-describe('golden renders', () => {
+/**
+ * The goldens record the platform, Pillow version and mono font that produced
+ * them. A different OS resolves a different mono font — Menlo on macOS,
+ * vendored JetBrains Mono elsewhere — so these renders genuinely cannot be
+ * reproduced there, and failing would be telling the reader off for something
+ * they cannot fix.
+ *
+ * Skipping is only honest if it is loud, so it prints why, and CI asserts on
+ * the macOS runner that this did not skip. A quietly skipped suite is worse
+ * than a deleted one: it still looks like coverage.
+ */
+if (report.skipped) {
+  console.log(`\n  ─ golden renders skipped: ${report.reason}` +
+    `\n    goldens: ${JSON.stringify(report.expected)}` +
+    `\n    here:    ${JSON.stringify(report.actual)}` +
+    `\n    Regenerate for this platform with: bun run test:golden:update\n`)
+}
+
+describe.skipIf(!!report.skipped)('golden renders', () => {
   test('the comparison ran at all', () => {
-    // A missing goldens directory or a renderer that crashed is its own
-    // failure, not five confusing per-slide ones.
+    // A missing goldens directory, drifted Pillow, or a renderer that crashed
+    // is its own failure, not five confusing per-slide ones.
     expect(report.error).toBeUndefined()
     expect(report.slides?.length).toBeGreaterThan(0)
   })

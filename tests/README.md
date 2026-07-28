@@ -90,16 +90,27 @@ Then **look at the new PNGs before committing them**. A golden is only worth
 having if what it records is correct — accepting a render without opening it is
 how a bug becomes the reference.
 
-### The Pillow caveat
+### Provenance, and why this suite skips on Linux
+
+`golden/manifest.json` records the platform, Pillow version and mono font that
+produced the committed renders. `compare` checks it before diffing a pixel, and
+the two mismatches mean different things:
+
+- **Different platform → skip, loudly, with the reason.** macOS resolves Menlo
+  for the terminal face and other systems get the vendored JetBrains Mono, so
+  the renders genuinely cannot be reproduced. Failing there would be telling
+  the reader off for something they cannot fix, and a test like that gets muted.
+- **Same platform, different Pillow or mono font → fail.** Something underneath
+  moved, and it changes the slides you export.
+
+CI runs this job on `macos-latest` to match the committed goldens, and asserts
+the suite did **not** skip — a quietly skipped suite is worse than a deleted
+one, because it still looks like coverage.
 
 These thresholds cannot tell a real regression from a FreeType rasterizer
-change, because a rasterizer change moves far more pixels than an extra terminal
-line does. Nothing measurable separates them, so the test does not pretend to.
-
-Pillow is pinned exactly in `requirements.txt` for this reason. Bumping it is
-expected to turn the goldens red — that is the test working, because a Pillow
-bump really does change the PNGs you post. Check the slides still read
-correctly, then `update`.
+change; a rasterizer change moves far more pixels than an extra terminal line
+does. Nothing measurable separates them, so the test does not pretend to — the
+manifest names the cause instead of leaving you an unexplained diff.
 
 ## Fixtures
 
@@ -108,4 +119,5 @@ correctly, then `update`.
 | `clean-deck.json` | A correct carousel. Zero findings, and the golden deck. Exercises the cover pill, step numbers, the terminal window, body copy, CTA and the 9:16 canvas. |
 | `findings.json` | One slide per check, with the exact codes it must produce. |
 | `golden/` | Committed reference renders. Regenerate deliberately, never casually. |
+| `golden/manifest.json` | Platform, Pillow version and mono font the renders were made with. |
 | `golden/_failed/` | Written by a failing run. Gitignored. |

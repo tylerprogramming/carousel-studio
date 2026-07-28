@@ -138,7 +138,7 @@ flash_video.py         A standalone 1080x1920 Reel
 tiktok_safe.py         Reframe a slide clear of TikTok's UI
 themes/                One JSON per theme
 frameworks/            One JSON per framework
-fonts/                 Inter, vendored so exports match the preview
+fonts/                 Inter and JetBrains Mono, vendored so exports match the preview
 client/src/            React 19 + Vite, port 5175
 ```
 
@@ -179,3 +179,6 @@ Point `exportDir` at a content repo to write straight into it.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+The vendored fonts keep their own: Inter and JetBrains Mono are both SIL Open
+Font License 1.1, see [`fonts/JetBrainsMono-OFL.txt`](fonts/JetBrainsMono-OFL.txt).
