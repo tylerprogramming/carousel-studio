@@ -1,0 +1,30 @@
+{
+  "//": [
+    "The server and the tests. The client has its own tsconfig, because it is a",
+    "different environment: DOM, JSX, Vite.",
+    "",
+    "Before this file existed `bun run typecheck` ran `tsc --noEmit` here with no",
+    "project to point it at, so tsc printed its help and exited 1 — which meant",
+    "the `&&` never reached the client and neither half was ever checked.",
+    "",
+    "tests/ pulls in client/src/lib/geometry.ts, which is the point: the table",
+    "the parity test compares against is the same file the preview renders from."
+  ],
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext"],
+    "types": ["bun"],
+
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "noFallthroughCasesInSwitch": true,
+
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["server.ts", "tests/**/*.ts"]
+}

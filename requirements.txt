@@ -1,2 +1,8 @@
 # Slide rendering. Everything else in the Python layer is stdlib.
-Pillow>=10.0.0
+#
+# Pinned exactly, not floored. Pillow bundles its own FreeType, and a different
+# FreeType rasterizes text differently — which changes the PNGs you export and
+# turns tests/golden.py red. That is the golden test working correctly, but it
+# should happen when someone deliberately bumps this line, not on a fresh
+# install six months from now. See tests/README.md.
+Pillow==11.3.0

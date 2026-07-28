@@ -1,0 +1,84 @@
+{
+  "_comment": [
+    "A carousel that is correct, and has to stay that way.",
+    "",
+    "This is the false-positive guard. The first version of check_slides.py",
+    "reported five errors on slides that render fine, and a checker that cries",
+    "wolf is worse than no checker: you stop reading it, and then it is right",
+    "once and you miss it. Every slide here must produce zero findings, error",
+    "and warning both.",
+    "",
+    "It is also the golden-image deck, so it deliberately exercises each",
+    "drawing path: cover pill, step number, terminal window, body copy, CTA,",
+    "and the 9:16 tall canvas."
+  ],
+  "title": "Renderer Fixture Deck",
+  "slides": [
+    {
+      "id": "fx-1",
+      "slideNumber": 1,
+      "type": "cover",
+      "variant": "terminal",
+      "headline": "Four commands, no editor",
+      "emphasisLine": "No timeline. No scrubbing.",
+      "bgColor": "#12141A",
+      "textColor": "#EEECE8",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "fx-2",
+      "slideNumber": 2,
+      "type": "content",
+      "variant": "terminal",
+      "stepNumber": 1,
+      "headline": "Pull the transcript",
+      "emphasisLine": "Whisper, locally",
+      "terminalLines": [
+        "$ hyperframes transcribe clip.mp4",
+        "  -> clip.srt written in 12s",
+        "$ head -3 clip.srt"
+      ],
+      "bgColor": "#12141A",
+      "textColor": "#EEECE8",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "fx-3",
+      "slideNumber": 3,
+      "type": "content",
+      "variant": "terminal",
+      "stepNumber": 2,
+      "headline": "Cut the dead air",
+      "bodyText": "Silence removal runs on the transcript, not the waveform, so it never clips the start of a word.",
+      "bgColor": "#12141A",
+      "textColor": "#EEECE8",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "fx-4",
+      "slideNumber": 4,
+      "type": "cta",
+      "variant": "terminal",
+      "headline": "The whole pipeline is open source",
+      "emphasisLine": "Comment EDIT for the repo",
+      "bgColor": "#12141A",
+      "textColor": "#EEECE8",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "fx-5",
+      "slideNumber": 5,
+      "type": "cover",
+      "variant": "tall",
+      "headline": "Same slide, native 9:16",
+      "emphasisLine": "Not a 4:5 padded to fit",
+      "terminalLines": [
+        "$ hyperframes render --tall",
+        "  -> 1080x1920"
+      ],
+      "bgColor": "#12141A",
+      "textColor": "#EEECE8",
+      "accentColor": "#E07355"
+    }
+  ]
+}
