@@ -82,6 +82,8 @@ cp settings.example.json settings.json
 | `likenessPath` | A photo of you, used as a reference image for generation. |
 | `likenessDescription` | Appended to image prompts so the model gets you right. |
 | `pythonPath` | The interpreter that renders slides. Unset, the first one that can import Pillow wins. |
+| `fontPath` | Body typeface. A filename in `fonts/`, or an absolute path. Unset, the vendored Inter. |
+| `monoFontPath` | Monospace typeface for the terminal variant. Same rules. |
 
 If you have more than one Python, set `pythonPath`. The app does not trust
 `python3` to mean the same thing tomorrow — installing anything that pulls in a
@@ -103,6 +105,13 @@ swatch. Only the three colours are required.
 ```
 
 Full format and the contrast trap: [`themes/README.md`](themes/README.md).
+
+## Fonts
+
+Drop a `.ttf` in `fonts/` and name it in `settings.json` as `fontPath`. The
+browser is served the same file the renderer draws with, so the preview stays a
+preview. Variable fonts get their weight axis driven properly; static fonts work
+but come out at one weight. See [`fonts/README.md`](fonts/README.md).
 
 ## Frameworks
 
@@ -183,6 +192,7 @@ client/src/            React 19 + Vite, port 5175
 | `GET` | `/api/exports` | Exported carousels |
 | `GET` `POST` | `/api/settings` | Read / update settings |
 | `GET` | `/api/health` | Which Python, what it renders with, whether ffmpeg is present |
+| `GET` | `/api/fonts` | Typefaces available in `fonts/`, and which are selected |
 
 ## Keyboard shortcuts
 

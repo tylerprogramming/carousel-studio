@@ -10,6 +10,7 @@ import {
 } from './lib/paths'
 import { creatorHandle, loadEnv, readSettings, writeSettings } from './lib/settings'
 import { MIME, mediaType, pngSize, slugFromTitle } from './lib/media'
+import { FONTS_DIR, fontPayload, listFonts } from './lib/fonts'
 import {
   hasFfmpeg, python, pythonBin, pythonCandidates, reportPython,
 } from './lib/python'
@@ -50,6 +51,30 @@ app.get('/api/health', (c) => {
     ffmpeg: hasFfmpeg(),
     // Only video needs ffmpeg; PNG and PDF do not.
     capabilities: { render: !!py, video: !!py && hasFfmpeg() },
+  })
+})
+
+/** The typefaces available to draw with, and which are selected. */
+app.get('/api/fonts', (c) => c.json(listFonts()))
+
+/** Serve a font file to the browser.
+ *
+ *  The same file the renderer draws with, which is the entire point — a custom
+ *  face that only the exporter can see would make the preview a preview of the
+ *  wrong thing. Confined to fonts/ by basename, so a configured absolute path
+ *  cannot be used to read elsewhere on disk. */
+app.get('/fonts/:name', async (c) => {
+  const name = c.req.param('name')
+  if (name.includes('/') || name.includes('..')) return c.text('Not found', 404)
+  const path = join(FONTS_DIR, name)
+  if (!existsSync(path)) return c.text('Not found', 404)
+  return new Response(Bun.file(path), {
+    headers: {
+      'Content-Type': mediaType(name) === 'application/octet-stream'
+        ? (MIME[name.slice(name.lastIndexOf('.')).toLowerCase()] ?? 'font/ttf')
+        : mediaType(name),
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    },
   })
 })
 
@@ -210,7 +235,7 @@ app.post('/api/generate-slide', async (c) => {
 
   const filename = `slide_${slideId || Date.now()}.png`
   const outputPath = join(OUTPUT_DIR, filename)
-  const payload = JSON.stringify({ ...slideData, handle: creatorHandle(), output: outputPath })
+  const payload = JSON.stringify({ ...slideData, handle: creatorHandle(), ...fontPayload(), output: outputPath })
   const scriptPath = join(APP_ROOT, 'generate_slide.py')
 
   const proc = Bun.spawn([pythonBin(), scriptPath, payload], { stdout: 'ignore', stderr: 'pipe' })
@@ -245,6 +270,7 @@ app.post('/api/export-all', async (c) => {
   // Step 1: always generate PNGs — rendered in parallel, one python process per slide
   type Render = { slide: any; filename: string; outputPath: string; payload: string }
   const handle = creatorHandle()   // invariant across the batch
+  const fonts  = fontPayload()     // likewise — one settings read, not one per slide
   const renders: Render[] = slides.map((slide: any) => {
     const filename   = `slide_${slide.slideNumber}.png`
     const outputPath = join(slugDir, filename)
@@ -254,6 +280,7 @@ app.post('/api/export-all', async (c) => {
       ...slide,
       totalSlides:        slides.length,
       handle,
+      ...fonts,
       backgroundImagePath: resolveMediaPath(slide.backgroundImage) ?? undefined,
       backgroundVideoPath: resolveMediaPath(slide.backgroundVideo) ?? undefined,
       insetImagePath:      resolveMediaPath(slide.insetImageUrl) ?? undefined,
@@ -358,7 +385,7 @@ app.post('/api/summary-slide', async (c) => {
   mkdirSync(slugDir, { recursive: true })
   const outputPath = join(slugDir, 'summary.png')
   const payload = JSON.stringify({
-    ...summary, totalSlides: 1, handle: creatorHandle(), output: outputPath,
+    ...summary, totalSlides: 1, handle: creatorHandle(), ...fontPayload(), output: outputPath,
   })
   const proc = Bun.spawn([pythonBin(), join(APP_ROOT, 'generate_slide.py'), payload],
                          { stdout: 'ignore', stderr: 'pipe' })
@@ -416,7 +443,7 @@ app.post('/api/check', async (c) => {
   const { slides, strict = false } = await c.req.json()
   if (!Array.isArray(slides)) return c.json({ error: 'slides array is required' }, 400)
   const proc = Bun.spawn([pythonBin(), join(APP_ROOT, 'check_slides.py'),
-                          JSON.stringify({ slides, strict })],
+                          JSON.stringify({ slides, strict, ...fontPayload() })],
                          { stdout: 'pipe', stderr: 'pipe' })
   const [code, out, err] = await Promise.all([
     proc.exited, new Response(proc.stdout).text(), new Response(proc.stderr).text(),

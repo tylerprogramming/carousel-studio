@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { Slide } from '../types'
 import { useSettings } from '../hooks/useSettings'
 import { TALL_SAFE, terminalGeometry, slideAspect } from '../lib/geometry'
+import { useCustomFonts } from '../hooks/useCustomFonts'
 
 // The geometry table lives in lib/geometry.ts so tests can diff it against
 // generate_slide.py without pulling React in. Re-exported here because this is
@@ -39,6 +40,7 @@ function blend(fg: string, bg: string, f: number) {
  */
 function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps>) {
   const { handle, username } = useSettings()
+  const { bodyFamily, monoFamily } = useCustomFonts()
   const ts = slide.textScale ?? 1
   const s = (px: number) => Math.round(px * scale)
   const sf = (px: number) => Math.round(px * scale * ts)
@@ -54,7 +56,9 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
   // Mirrors MONO_FONTS in generate_slide.py, in the same order: Menlo on macOS,
   // JetBrains Mono everywhere else. Leaving it at the bare `monospace` keyword
   // meant the browser picked one font and the exporter picked another.
-  const MONO = "'Menlo','SFMono-Regular','JetBrains Mono',ui-monospace,monospace"
+  // Mirrors load_mono() in generate_slide.py: a configured face wins, then the
+  // system ones, then the vendored JetBrains Mono.
+  const MONO = `${monoFamily}'Menlo','SFMono-Regular','JetBrains Mono',ui-monospace,monospace`
 
   const g = terminalGeometry(slide.variant === 'tall')
   const W = s(g.width), H = s(g.height), PAD = s(g.padx)
@@ -76,7 +80,7 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
   return (
     <div style={{
       width: W, height: H, position: 'relative', overflow: 'hidden', flexShrink: 0,
-      background: BG, fontFamily: "'Inter', system-ui, sans-serif",
+      background: BG, fontFamily: `${bodyFamily}'Inter', system-ui, sans-serif`,
     }}>
       {/* Moving background, so the editor shows what the mp4 export will do. */}
       {slide.backgroundVideo && (
@@ -225,6 +229,9 @@ function TerminalSlide({ slide, scale, totalSlides }: Required<SlidePreviewProps
 }
 
 function SlidePreview({ slide, scale = 1, totalSlides = 7 }: SlidePreviewProps) {
+  // Called before the early return: hooks cannot be conditional, and the
+  // terminal branch below leaves this component entirely.
+  const { bodyFamily } = useCustomFonts()
   // Both terminal variants are the same drawing at two canvas sizes
   if (slide.variant === 'terminal' || slide.variant === 'tall') {
     return <TerminalSlide slide={slide} scale={scale} totalSlides={totalSlides} />
@@ -258,7 +265,7 @@ function SlidePreview({ slide, scale = 1, totalSlides = 7 }: SlidePreviewProps) 
     <div style={{
       width: W, height: H, position: 'relative', overflow: 'hidden', flexShrink: 0,
       background: (slide.backgroundImage || slide.backgroundVideo) ? '#111' : slide.bgColor,
-      fontFamily: "'Inter', system-ui, sans-serif",
+      fontFamily: `${bodyFamily}'Inter', system-ui, sans-serif`,
     }}>
       {/* Background image */}
       {slide.backgroundImage && !slide.backgroundVideo && (

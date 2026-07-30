@@ -38,7 +38,8 @@ TALL_SAFE_TOP = 130       # status bar, and the Following / For You tabs
 TALL_SAFE_RIGHT = 150     # like / comment / share / sound rail
 TALL_SAFE_BOTTOM = 340    # caption block, username, bottom nav
 
-FONT_PATH = Path(__file__).parent / 'fonts' / 'Inter-Variable.ttf'
+FONTS_DIR = Path(__file__).parent / 'fonts'
+FONT_PATH = FONTS_DIR / 'Inter-Variable.ttf'
 
 # macOS fallbacks, used only when the vendored Inter is missing. Exports will
 # not match the preview in that case.
@@ -48,23 +49,98 @@ FALLBACK_FONTS = [
 ]
 
 
+def resolve_font(configured: str, default: Path) -> Path:
+    """A configured typeface, or the vendored one.
+
+    A bare name means a file in fonts/, which is the normal case — drop a .ttf
+    in there and name it. An absolute path or a ~ path is taken as given. A
+    configured font that does not exist falls back rather than failing: a typo
+    in settings.json should not stop you rendering.
+    """
+    if configured:
+        p = Path(configured).expanduser()
+        if not p.is_absolute():
+            p = FONTS_DIR / configured
+        if p.exists():
+            return p
+    return default
+
+
 @lru_cache(maxsize=None)
-def load_font(size: int, weight: int = 400) -> ImageFont.FreeTypeFont:
-    """Inter at an explicit weight. Inter ships as a variable font, so weight is
-    selected on the wght axis rather than by loading a separate file."""
+def variation_plan(font_file: str):
+    """Where the weight axis is in this font, and what the other axes default to.
+
+    Returns (weight_axis_index, defaults) — or (None, ()) for a static font,
+    which is most of them.
+
+    The axes are found by name rather than by position. The old code set
+    `[14.0, float(weight)]`, which is correct for Inter and wrong for anything
+    else: a font whose axes come in a different order would have had its weight
+    written into whichever axis happened to be second. That was invisible while
+    one font was vendored and is the first thing a custom font would hit.
+
+    Every other axis keeps its default, which is what holds Inter's optical size
+    at 14 for every size — matching `font-optical-sizing: none` in the preview.
+    """
+    try:
+        axes = ImageFont.truetype(font_file, 16).get_variation_axes()
+    except Exception:
+        return (None, ())          # static font, or unreadable
+    defaults, weight_at = [], None
+    for i, axis in enumerate(axes):
+        defaults.append(axis.get('default', 0))
+        name = axis.get('name', b'')
+        if isinstance(name, bytes):
+            name = name.decode('utf-8', 'ignore')
+        if str(name).strip().lower() == 'weight':
+            weight_at = i
+    return (weight_at, tuple(defaults))
+
+
+# The typefaces this render is using. Set once per slide from the payload
+# rather than threaded through the twenty-odd load_font calls in the layout
+# code, which would bury the design under plumbing. Every render is its own
+# process, so this is set once and never contended; the caches are cleared when
+# it changes so a stale face can never be served under a new setting.
+_ACTIVE_FONT = ''
+_ACTIVE_MONO = ''
+
+
+def set_fonts(font_path: str = '', mono_path: str = '') -> None:
+    global _ACTIVE_FONT, _ACTIVE_MONO
+    if (font_path or '') == _ACTIVE_FONT and (mono_path or '') == _ACTIVE_MONO:
+        return
+    _ACTIVE_FONT, _ACTIVE_MONO = font_path or '', mono_path or ''
+    load_font.cache_clear()
+    load_mono.cache_clear()
+
+
+@lru_cache(maxsize=None)
+def load_font(size: int, weight: int = 400, font_path: str = '') -> ImageFont.FreeTypeFont:
+    """The body typeface at an explicit weight.
+
+    A variable font carries weight on an axis, so one file covers the range. A
+    static font has no axis and is drawn as it is — the design still asks for
+    800 in places, and with a single-weight face those simply come out at that
+    face's weight rather than failing.
+    """
     size = max(8, int(size))
-    if FONT_PATH.exists():
-        font = ImageFont.truetype(str(FONT_PATH), size)
-        try:
-            # Axis order is [Optical size, Weight]
-            font.set_variation_by_axes([14.0, float(weight)])
-        except Exception:
-            pass
-        return font
-    for path in FALLBACK_FONTS:
-        if os.path.exists(path):
+    path = resolve_font(font_path or _ACTIVE_FONT, FONT_PATH)
+    if path.exists():
+        font = ImageFont.truetype(str(path), size)
+        weight_at, defaults = variation_plan(str(path))
+        if weight_at is not None:
+            axes = list(defaults)
+            axes[weight_at] = float(weight)
             try:
-                return ImageFont.truetype(path, size)
+                font.set_variation_by_axes(axes)
+            except Exception:
+                pass
+        return font
+    for p in FALLBACK_FONTS:
+        if os.path.exists(p):
+            try:
+                return ImageFont.truetype(p, size)
             except Exception:
                 continue
     return ImageFont.load_default()
@@ -257,6 +333,15 @@ def mono_safe(text: str) -> str:
 
 @lru_cache(maxsize=None)
 def load_mono(size: int) -> ImageFont.FreeTypeFont:
+    # A configured mono face wins over the system ones. Without it the search
+    # runs Menlo, Monaco, then the vendored JetBrains Mono — see MONO_FONTS.
+    if _ACTIVE_MONO:
+        p = resolve_font(_ACTIVE_MONO, Path(MONO_FONTS[-1]))
+        if p.exists():
+            try:
+                return ImageFont.truetype(str(p), max(8, int(size)))
+            except Exception:
+                pass
     for p in MONO_FONTS:
         if os.path.exists(p):
             try:
@@ -502,6 +587,9 @@ def generate_terminal_slide(data):
 
 
 def generate_slide(data):
+    # Before anything measures or draws. Both variants come through here, so
+    # this is the single place the typeface is decided for a render.
+    set_fonts(data.get('fontPath'), data.get('monoFontPath'))
     # Both terminal variants are the same drawing at two canvas sizes
     if data.get('variant') in ('terminal', 'tall'):
         return generate_terminal_slide(data)

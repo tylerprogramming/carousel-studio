@@ -31,6 +31,7 @@ from generate_slide import (
     load_mono,
     luminance,
     mono_safe,
+    set_fonts,
     terminal_geometry,
     text_width,
     wrap_text,
@@ -192,6 +193,10 @@ def check_slide(draw, slide, index):
 
 
 def run(cfg):
+    # The checker measures with the same fonts the renderer draws with, so a
+    # custom typeface has to reach it too. Without this, a deck set in a wider
+    # face would be measured in Inter and reported as fitting when it does not.
+    set_fonts(cfg.get('fontPath'), cfg.get('monoFontPath'))
     slides = cfg.get('slides') or []
     if not slides:
         return {'ok': False, 'counts': {'error': 1, 'warning': 0},

@@ -5,6 +5,7 @@ import { join } from 'path'
 import { APP_ROOT, OUTPUT_DIR, audioDir, exportDir, resolveAudio, resolveMediaPath } from '../lib/paths'
 import { creatorHandle, readSettings } from '../lib/settings'
 import { pngSize, slugFromTitle } from '../lib/media'
+import { fontPayload } from '../lib/fonts'
 import { pythonBin } from '../lib/python'
 
 /**
@@ -144,7 +145,7 @@ renditionRoutes.post('/api/slide-video', async (c) => {
 
   const overlayPath = join(OUTPUT_DIR, `overlay_${Date.now()}.png`)
   const overlayPayload = JSON.stringify({
-    ...slide, handle: creatorHandle(), transparent: true, output: overlayPath,
+    ...slide, handle: creatorHandle(), ...fontPayload(), transparent: true, output: overlayPath,
   })
   const slideScript = join(APP_ROOT, 'generate_slide.py')
   const overlayProc = Bun.spawn([pythonBin(), slideScript, overlayPayload], { stdout: 'ignore', stderr: 'pipe' })
@@ -201,6 +202,7 @@ renditionRoutes.post('/api/flash-video', async (c) => {
     listItems: body.listItems || [],
     summaryLine: body.summaryLine || '',
     handle: body.handle || creatorHandle(),
+    ...fontPayload(),
     bgColor: body.bgColor || '#F5F0EB',
     textColor: body.textColor || '#1B1B1B',
     accentColor: body.accentColor || '#E07355',

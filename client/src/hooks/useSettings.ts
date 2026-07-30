@@ -16,6 +16,10 @@ export interface Settings {
   likenessDescription?: string
   /** Interpreter used to render slides. Unset, the first one with Pillow wins. */
   pythonPath?: string
+  /** Body typeface. A filename in fonts/, or an absolute path. */
+  fontPath?: string
+  /** Monospace typeface for the terminal variant. Same rules. */
+  monoFontPath?: string
 }
 
 const DEFAULT_HANDLE = '@yourhandle'

@@ -43,6 +43,7 @@ describe('read-only API routes', () => {
     ['/api/images', 'any'],
     ['/api/exports', 'any'],
     ['/api/flash-videos', 'any'],
+    ['/api/fonts', 'any'],
   ]
 
   for (const [path, kind] of cases) {
@@ -119,6 +120,28 @@ describe('missing things 404 rather than becoming a web page', () => {
       expect(res.status).toBe(404)
     })
   }
+})
+
+describe('fonts are served to the browser', () => {
+  // The renderer and the browser must load the same file. If this route breaks,
+  // the preview silently falls back to Inter while exports use the custom face —
+  // the parity contract broken in the way that is hardest to notice, because
+  // both halves look fine on their own.
+  test('the vendored faces are downloadable', async () => {
+    for (const file of ['Inter-Variable.ttf', 'JetBrainsMono-Regular.ttf']) {
+      const res = await get(`/fonts/${file}`)
+      expect(res.status).toBe(200)
+      expect(res.headers.get('content-type')).toContain('font')
+    }
+  })
+
+  test('a font name cannot escape fonts/', async () => {
+    // The route is confined by basename, so a configured absolute path
+    // elsewhere on disk cannot be turned into a read of anything else.
+    for (const attempt of ['..%2Fsettings.json', '..%2F..%2Fetc%2Fpasswd', 'nope.ttf']) {
+      expect((await get(`/fonts/${attempt}`)).status).toBe(404)
+    }
+  })
 })
 
 describe('the SPA catch-all still catches', () => {
