@@ -4,7 +4,8 @@ Build branded carousels for Instagram, TikTok and LinkedIn. AI writes the copy,
 you control the design, and the export matches what you saw on screen.
 
 Runs locally. Bring your own API keys — nothing goes anywhere except the model
-provider you configure.
+provider you configure. No CDN, no telemetry, no font requests; the editor
+works with the network off.
 
 ![Version](https://img.shields.io/badge/version-2.1.7-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -138,7 +139,8 @@ flash_video.py         A standalone 1080x1920 Reel
 tiktok_safe.py         Reframe a slide clear of TikTok's UI
 themes/                One JSON per theme
 frameworks/            One JSON per framework
-fonts/                 Inter and JetBrains Mono, vendored so exports match the preview
+fonts/                 Inter and JetBrains Mono, vendored -- the renderer and the
+                       browser load the same files, so no CDN and no drift
 client/src/            React 19 + Vite, port 5175
 ```
 

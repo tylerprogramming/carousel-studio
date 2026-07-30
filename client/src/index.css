@@ -1,3 +1,35 @@
+/* ── Fonts ──────────────────────────────────────────────────────────────────
+ *
+ * Served from the same files generate_slide.py draws with, not from a CDN.
+ *
+ * The app used to link fonts.googleapis.com, which made three claims false at
+ * once. The README said nothing leaves your machine except calls to your model
+ * provider, and every page load pinged Google. The app did not work offline —
+ * with the CDN unreachable the UI fell back to system-ui while exports stayed
+ * Inter, so the preview quietly stopped being a preview. And the exporter used
+ * the vendored Inter while the browser used Google's, which is the same face
+ * but not guaranteed the same cut; nothing in the test suite would have caught
+ * them diverging, because the goldens only exercise the Python side.
+ *
+ * Vite fingerprints and inlines these at build time, so there is no runtime
+ * fetch either way.
+ */
+@font-face {
+  font-family: 'Inter';
+  src: url('../../fonts/Inter-Variable.ttf') format('truetype');
+  font-weight: 100 900;      /* wght axis, driven by font-weight as normal */
+  font-style: normal;
+  font-display: block;       /* swap would flash system-ui over the preview */
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../../fonts/JetBrainsMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -58,6 +90,16 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Inter carries an optical-size axis running 14 to 32, and browsers default
+   * to font-optical-sizing: auto — opsz tracks the font size, so a 118px
+   * headline is drawn with a display cut. generate_slide.py pins the axis at
+   * 14.0 for every size, so the preview was letting the browser reshape type
+   * the exporter never reshapes. Pinning it here holds the axis at its default
+   * of 14 and leaves font-weight to drive wght as usual.
+   *
+   * Mirrors set_variation_by_axes([14.0, weight]) in load_font(). */
+  * { font-optical-sizing: none; }
 }
 
 /* ── Scrollbars ─────────────────────────────────────────────────────────────── */

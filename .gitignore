@@ -21,6 +21,10 @@ settings.json
 *.env
 !.env.example
 
+# Python bytecode, created whenever one script imports another
+__pycache__/
+*.pyc
+
 # Golden-test failure artifacts. The goldens themselves are committed; what a
 # failing run drops beside them for you to look at is not.
 tests/fixtures/golden/_failed/

@@ -13,6 +13,11 @@ export default defineConfig({
   server: {
     port: 5175,
     allowedHosts,
+    // index.css declares @font-face against ../../fonts, which is outside the
+    // client root. Vite refuses to serve above the root in dev unless the path
+    // is allowed, and the failure looks like the fonts silently not loading.
+    // The build has no such restriction; this is dev-only.
+    fs: { allow: ['..'] },
     proxy: {
       '/api': 'http://localhost:3010',
       '/files': 'http://localhost:3010',
