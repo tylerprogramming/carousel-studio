@@ -148,7 +148,10 @@ Same idea, different job.
 ## Layout
 
 ```
-server.ts              Hono API, port 3010
+server.ts              Hono app: settings, themes, carousels, rendering, libraries
+lib/                   Paths, settings, the Python resolver, media types
+routes/                ai.ts (copy + captions), jobs.ts (image queue),
+                       renditions.ts (TikTok reframe, video)
 generate_slide.py      Slide renderer + PDF combiner  -- twin of SlidePreview.tsx
 tests/                 Parity, checker and golden-render tests. See tests/README.md
 generate_bg_image.py   Kie.ai image generation

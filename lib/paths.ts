@@ -80,3 +80,15 @@ export function ensureDirs() {
   mkdirSync(CAROUSELS_DIR, { recursive: true })
   try { mkdirSync(imagesDir(), { recursive: true }) } catch { /* non-fatal */ }
 }
+
+/** The audio bed to lay under a video: what the caller asked for, else the
+ *  configured default, else nothing. Never guesses at a file on disk. */
+export function resolveAudio(requested?: string): string | undefined {
+  const explicit = requested ? resolveMediaPath(requested) : null
+  if (explicit) return explicit
+  const configured = readSettings().audioPath
+  if (!configured) return undefined
+  const abs = expandPath(configured.startsWith('/') || configured.startsWith('~')
+    ? configured : join(APP_ROOT, configured))
+  return existsSync(abs) ? abs : undefined
+}
