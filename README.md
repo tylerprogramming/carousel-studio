@@ -12,6 +12,13 @@ works with the network off.
 ![Bun](https://img.shields.io/badge/runtime-Bun-black)
 [![CI](https://github.com/tylerprogramming/carousel-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/tylerprogramming/carousel-studio/actions/workflows/ci.yml)
 
+![Three exported slides: a cover, a step with a terminal window, and a call to action](docs/slides.png)
+
+These are exported PNGs, not mockups — and they are the same files the test
+suite holds the renderer to, so this picture cannot drift from what you get.
+
+![The editor: slide strip on the left, live phone preview in the middle, inspector on the right](docs/editor.jpg)
+
 ## What it does
 
 - **Writes the slides.** Give it a topic and a framework; Claude returns every
