@@ -5,6 +5,7 @@ import { join } from 'path'
 
 import { CAROUSELS_DIR, FRAMEWORKS_DIR, exportDir } from '../lib/paths'
 import { creatorHandle, loadEnv, readSettings } from '../lib/settings'
+import { describeSlides } from '../lib/alt'
 
 /**
  * Everything that asks a model for words: slide copy and captions.
@@ -277,7 +278,11 @@ Primary platform: ${platform}
 Slides:
 ${outline}
 
-Write captions for this carousel.`
+Write captions for this carousel, and alt text for every one of its ${slides.length} slides.
+
+The slides are almost entirely text, so the alt text should read the slide out
+rather than describe how it looks. Someone who cannot see the image needs the
+headline and the commands, not the colour scheme.`
 
   const schema = {
     type: 'object',
@@ -285,13 +290,18 @@ Write captions for this carousel.`
       instagram: { type: 'string', description: 'Instagram caption. Hook on line one, then value, then a soft CTA. No hashtags in this field.' },
       hashtags:  { type: 'array', items: { type: 'string' }, description: 'Exactly 5 Instagram hashtags, each starting with #' },
       linkedin:  { type: 'string', description: 'LinkedIn caption. Slightly longer and more professional. No hashtags at all.' },
+      altText: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Alt text for every slide, in order, one entry per slide. Read the slide out: its headline, its emphasis line, and any terminal commands verbatim. Do not describe colours, fonts or layout. Start each with "Slide N of M".',
+      },
     },
-    required: ['instagram', 'hashtags', 'linkedin'],
+    required: ['instagram', 'hashtags', 'linkedin', 'altText'],
     additionalProperties: false,
   }
 
   try {
-    let parsed: { instagram: string; hashtags: string[]; linkedin: string }
+    let parsed: { instagram: string; hashtags: string[]; linkedin: string; altText?: string[] }
 
     if (anthropicKey) {
       const anthropic = new Anthropic({ apiKey: anthropicKey })
@@ -326,13 +336,22 @@ Write captions for this carousel.`
       instagram: stripEmDashes(parsed.instagram),
       hashtags:  (parsed.hashtags ?? []).map((h) => (h.startsWith('#') ? h : `#${h}`)),
       linkedin:  stripEmDashes(parsed.linkedin),
+      // Composed locally first, then replaced by the model's version only where
+      // it actually returned one. A model that skips a slide, or returns a
+      // one-word entry, must not leave that slide with no description at all —
+      // the fallback is derived from the slide's own text and is always valid.
+      altText: describeSlides(slides).map((fallback, i) => {
+        const written = stripEmDashes(parsed.altText?.[i] ?? '')
+        return written.length >= 15 ? written : fallback
+      }),
     }
 
     let savedTo: string | null = null
     if (save && slug) {
       const dir = join(exportDir(), slug)
       mkdirSync(dir, { recursive: true })
-      const md = `# ${title}\n\n## Instagram\n\n${captions.instagram}\n\n${captions.hashtags.join(' ')}\n\n## LinkedIn\n\n${captions.linkedin}\n`
+      const alt = captions.altText.map((t, i) => `${i + 1}. ${t}`).join('\n')
+      const md = `# ${title}\n\n## Instagram\n\n${captions.instagram}\n\n${captions.hashtags.join(' ')}\n\n## LinkedIn\n\n${captions.linkedin}\n\n## Alt text\n\nOne per slide, in order. Paste when posting — Instagram takes it per image under Advanced settings.\n\n${alt}\n`
       const path = join(dir, 'captions.md')
       writeFileSync(path, md)
       savedTo = path

@@ -99,6 +99,13 @@ export default function CaptionEditor({ captions, onChange, title, platform, sli
     setTagDraft((d) => (parseTags(d).join(' ') === joined ? d : joined))
   }, [joined])
 
+  const alt = captions.altText ?? []
+  function setAlt(index: number, value: string) {
+    const next = [...alt]
+    next[index] = value
+    set('altText', next)
+  }
+
   function set<K extends keyof CarouselCaptions>(key: K, val: CarouselCaptions[K]) {
     onChange({ ...captions, [key]: val })
   }
@@ -121,6 +128,7 @@ export default function CaptionEditor({ captions, onChange, title, platform, sli
         // Instagram copy there, so seed an empty field and never overwrite one
         // that has been edited.
         tiktok: captions.tiktok?.trim() ? captions.tiktok : data.instagram,
+        altText: data.altText ?? captions.altText,
       })
     } catch (err) {
       setError(String(err))
@@ -187,6 +195,46 @@ export default function CaptionEditor({ captions, onChange, title, platform, sli
           />
           <p className="mt-1 text-[10px] text-muted-foreground">
             Space separated. A missing # is added when you leave the field.
+          </p>
+        </div>
+
+        <div className="mb-4">
+          <div className="mb-2 flex items-baseline justify-between">
+            <Label>Alt Text</Label>
+            <span className="text-[10px] text-muted-foreground">one per slide</span>
+          </div>
+          {alt.length === 0 ? (
+            <p className="rounded border border-dashed border-border px-3 py-4 text-[11px] text-muted-foreground">
+              Written from each slide's own words when you generate captions, so
+              it costs nothing extra and never comes back empty.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {alt.map((text, i) => (
+                <div key={i}>
+                  <div className="mb-0.5 flex items-baseline justify-between">
+                    <span className="text-[10px] font-medium text-muted-foreground">
+                      Slide {i + 1}
+                    </span>
+                    <span className={cn('text-[10px] tabular-nums',
+                      text.length > 100 ? 'text-amber-600' : 'text-muted-foreground')}>
+                      {text.length}/100
+                    </span>
+                  </div>
+                  <textarea
+                    value={text}
+                    onChange={(e) => setAlt(i, e.target.value)}
+                    rows={2}
+                    className="w-full resize-y rounded border border-input bg-background px-2 py-1.5 text-[11px] leading-snug"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            The words on these slides are inside the image, so a screen reader
+            gets nothing without this. Instagram takes it per image under
+            Advanced settings; over 100 characters it truncates.
           </p>
         </div>
 

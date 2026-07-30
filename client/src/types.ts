@@ -59,6 +59,13 @@ export interface CarouselCaptions {
   hashtags?: string[]
   /** Gate keyword this carousel asks for, e.g. "EDITOR". Empty means ungated. */
   gate?: string
+  /**
+   * One description per slide, in order, for people using a screen reader.
+   * The words on these slides are baked into a picture, so without this they
+   * are simply unavailable. Composed from each slide's own text when no model
+   * has been asked, so it is never empty.
+   */
+  altText?: string[]
   updatedAt?: string
 }
 

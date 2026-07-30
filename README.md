@@ -33,6 +33,8 @@ suite holds the renderer to, so this picture cannot drift from what you get.
   terminal design drawn native 9:16 for TikTok rather than padded to fit.
 - **Reframes for TikTok**, clear of the caption block and action rail. A `tall`
   carousel skips the reframe: it is already 1080x1920.
+- **Writes alt text**, one per slide, from the slide's own words — so it works
+  with no API key. Saved into `captions.md` to paste when you post.
 - Undo/redo, drag to reorder, shift-click any control to apply it to every
   slide, and an exports gallery.
 
