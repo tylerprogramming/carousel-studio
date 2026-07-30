@@ -14,6 +14,8 @@ export interface Settings {
   exportDir?: string
   likenessPath?: string
   likenessDescription?: string
+  /** Interpreter used to render slides. Unset, the first one with Pillow wins. */
+  pythonPath?: string
 }
 
 const DEFAULT_HANDLE = '@yourhandle'

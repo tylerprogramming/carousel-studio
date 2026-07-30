@@ -15,6 +15,7 @@ import SavedCarouselsDrawer from './components/SavedCarouselsDrawer'
 import BatchModal from './components/BatchModal'
 import ExportsGallery from './components/ExportsGallery'
 import JobStrip from './components/JobStrip'
+import HealthBanner from './components/HealthBanner'
 import ReadinessRail from './components/ReadinessRail'
 import CheckBadge from './components/CheckBadge'
 import {
@@ -554,6 +555,9 @@ export default function App() {
       {showExports && isMobile && <ExportsGallery onClose={() => setShowExports(false)} />}
 
       {header}
+      {/* Silent unless this machine cannot render, or cannot make video. Above
+          the job strip because it is a precondition for the jobs, not one. */}
+      <HealthBanner />
       <JobStrip jobs={running} onCancel={cancelJob} />
       {exportToast}
 
