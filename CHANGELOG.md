@@ -1,5 +1,51 @@
 # Changelog
 
+## 2.2.0
+
+**Bring your own typeface.** A branded content tool that cannot use your brand's
+font is a strange thing, and this one had Inter compiled into both halves.
+`fontPath` and `monoFontPath` in settings.json now choose the faces — a filename
+in `fonts/`, or an absolute path. The renderer is handed the resolved paths and
+the browser is served the same files, because a CSS stack the exporter cannot
+read would break the promise that the preview is a preview. `check_slides.py`
+gets them too: a deck set in a wider face measured in Inter would report as
+fitting when it does not. Variable fonts get their weight axis driven properly;
+static fonts work but come out at one weight. See [`fonts/README.md`](fonts/README.md).
+
+That surfaced a bug worth naming. Variable-font axes were set positionally, as
+`[14.0, weight]` — correct for Inter and wrong for anything else, since a font
+declaring its axes in a different order would have had its weight written into
+whichever axis came second. Axes are found by name now. Inter resolves to the
+same values it always did, and the reference renders are unchanged.
+
+**Alt text for every slide, with no API key.** Carousels are among the least
+accessible formats going: the words are baked into a picture, so a screen reader
+gets nothing unless someone types them out again. These slides are almost
+entirely text, which makes the description mostly mechanical, so it is composed
+locally and deterministically — accessibility is not the one feature that needs
+a credit card. `/api/captions` then asks a model to do better with the whole
+carousel in view, and falls back per slide, so one skipped entry cannot leave a
+slide undescribed. Terminal commands are read out verbatim rather than
+summarised as "a terminal window", which would discard the only thing on the
+slide worth having. Written into `captions.md` and editable per slide.
+
+**A place to start, if you want to contribute.** There was no CONTRIBUTING and
+no issue templates, which was fine while this was one person's repo and stopped
+being fine when it gained a test suite, a parity contract and CI that runs on
+strangers' pull requests. The render-bug template asks for `/api/health` first,
+because that output answers most render reports outright.
+
+**`server.ts` is 667 lines, down from 1,580.** The machinery moved to `lib/` and
+the three largest route groups to `routes/`. Nothing about behaviour changed, and
+that was checked rather than assumed: the route surface was diffed against a list
+taken before any of it started and stayed identical at all 35 routes through
+every move.
+
+Route tests came first, because `server.ts` had no coverage of any kind — the
+other suites all exercise the Python side. They are shaped around the failures
+this file has actually had, including a path that once fell through to the SPA
+catch-all and answered a request for an image with HTML.
+
 ## 2.1.8
 
 **No CDN.** The README's first claim was that nothing leaves your machine
