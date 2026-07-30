@@ -68,7 +68,101 @@ function readSettings(): Record<string, any> {
 function writeSettings(data: Record<string, any>) {
   const merged = { ...readSettings(), ...data }
   settingsCache = null
+  pythonCache = undefined      // pythonPath may have just changed
   writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2))
+}
+
+// ── Python ────────────────────────────────────────────────────────────────────
+//
+// Every render, check and video runs a Python script, and this used to spawn
+// the literal 'python3' at fourteen call sites. That does not mean "the Python
+// this app was set up with", it means "whatever is first on PATH right now" —
+// and that changes underneath you. A `brew install` of anything with a Python
+// dependency can put a fresh interpreter ahead of the one Pillow lives in. The
+// server still starts, the editor still loads, and the failure arrives when you
+// press Export on a finished carousel, as an ImportError in a toast.
+//
+// That happened during development, which is why this exists. So: find an
+// interpreter that can actually import PIL, prefer one the user names, and be
+// able to say which was chosen and why.
+
+/** Reports the things that decide whether, and how, a slide renders.
+ *  Pillow's version is not enough on its own — FreeType does the rasterising
+ *  and Raqm does the shaping, and both vary independently of it. */
+const PYTHON_PROBE = `
+import json, sys
+try:
+    import PIL, PIL.features
+except Exception:
+    sys.exit(1)
+print(json.dumps({
+    'version':  sys.version.split()[0],
+    'pillow':   PIL.__version__,
+    'freetype': PIL.features.version('freetype2'),
+    'raqm':     PIL.features.version('raqm'),
+}))
+`.trim()
+
+interface PythonInfo {
+  bin: string; version: string; pillow: string
+  freetype: string | null; raqm: string | null
+}
+
+let pythonCache: PythonInfo | null | undefined
+
+/** Candidates in order of authority: what you configured, what the environment
+ *  asked for, then the usual suspects. `python3` stays first among the guesses
+ *  so a working PATH is still honoured. */
+function pythonCandidates(): string[] {
+  const configured = (readSettings().pythonPath || '').trim()
+  // CAROUSEL_PYTHON beats settings.json, the way a real environment variable
+  // should: it is how you pin an interpreter for one run, or in CI, without
+  // editing a file you would then have to remember to change back.
+  //
+  // Deduped, so naming an interpreter that is also a default does not make the
+  // list read as though it were tried twice.
+  return [...new Set([
+    process.env.CAROUSEL_PYTHON,
+    configured && expandPath(configured),
+    'python3',
+    '/usr/bin/python3',
+    '/opt/homebrew/bin/python3',
+    '/usr/local/bin/python3',
+    'python',
+  ].filter(Boolean) as string[])]
+}
+
+function probePython(bin: string): PythonInfo | null {
+  try {
+    const p = Bun.spawnSync([bin, '-c', PYTHON_PROBE], { stdout: 'pipe', stderr: 'ignore' })
+    if (p.exitCode !== 0) return null
+    return { bin, ...JSON.parse(p.stdout.toString()) }
+  } catch {
+    return null                // not on PATH, not executable, not a Python
+  }
+}
+
+/** The first candidate that can import PIL, or null if none can. Resolved once;
+ *  saving settings clears it. */
+function python(): PythonInfo | null {
+  if (pythonCache !== undefined) return pythonCache
+  for (const bin of pythonCandidates()) {
+    const info = probePython(bin)
+    if (info) return (pythonCache = info)
+  }
+  return (pythonCache = null)
+}
+
+/** What to spawn. Falls back to a bare `python3` when nothing usable was found,
+ *  so the failure is the same ImportError it always was rather than a crash —
+ *  but /api/health and the startup banner will already have said so. */
+function pythonBin(): string {
+  return python()?.bin ?? 'python3'
+}
+
+function hasFfmpeg(): boolean {
+  try { return Bun.spawnSync(['ffmpeg', '-version'], { stdout: 'ignore', stderr: 'ignore' }).exitCode === 0 }
+  catch { return false }
 }
 
 /** The audio bed to lay under a video: what the caller asked for, else the
@@ -154,6 +248,24 @@ app.post('/api/settings', async (c) => {
   const body = await c.req.json()
   writeSettings(body)
   return c.json({ ok: true, settings: readSettings() })
+})
+
+/** Can this machine actually do the work? Answering before you have built a
+ *  carousel is the whole point: a missing Pillow used to surface as an
+ *  ImportError in a toast at the moment you pressed Export. */
+app.get('/api/health', (c) => {
+  const py = python()
+  return c.json({
+    ok: !!py,
+    python: py,
+    // Which candidates were considered, so "it picked the wrong one" is a
+    // debuggable statement rather than a guess.
+    searched: pythonCandidates(),
+    configured: (readSettings().pythonPath || '').trim() || null,
+    ffmpeg: hasFfmpeg(),
+    // Only video needs ffmpeg; PNG and PDF do not.
+    capabilities: { render: !!py, video: !!py && hasFfmpeg() },
+  })
 })
 
 // ── Themes ────────────────────────────────────────────────────────────────────
@@ -793,7 +905,7 @@ app.post('/api/jobs/generate-bg', async (c) => {
         referenceImages: refs,
         model,
       })
-      const proc = Bun.spawn(['python3', bgScript, payload], { stdout: 'ignore', stderr: 'pipe' })
+      const proc = Bun.spawn([pythonBin(), bgScript, payload], { stdout: 'ignore', stderr: 'pipe' })
       job.procs.add(proc as any)
       try {
         const code = await proc.exited
@@ -832,7 +944,7 @@ app.post('/api/generate-slide', async (c) => {
   const payload = JSON.stringify({ ...slideData, handle: creatorHandle(), output: outputPath })
   const scriptPath = join(import.meta.dir, 'generate_slide.py')
 
-  const proc = Bun.spawn(['python3', scriptPath, payload], { stdout: 'ignore', stderr: 'pipe' })
+  const proc = Bun.spawn([pythonBin(), scriptPath, payload], { stdout: 'ignore', stderr: 'pipe' })
   const [exitCode, stderr] = await Promise.all([
     proc.exited, new Response(proc.stderr).text(),
   ])
@@ -855,7 +967,7 @@ app.post('/api/export-all', async (c) => {
   // something you want to see rendered before you fix it.
   let check: any = null
   try {
-    const cp = Bun.spawn(['python3', join(import.meta.dir, 'check_slides.py'),
+    const cp = Bun.spawn([pythonBin(), join(import.meta.dir, 'check_slides.py'),
                           JSON.stringify({ slides })], { stdout: 'pipe', stderr: 'ignore' })
     const [cc, co] = await Promise.all([cp.exited, new Response(cp.stdout).text()])
     if (cc === 0) check = JSON.parse(co)
@@ -882,7 +994,7 @@ app.post('/api/export-all', async (c) => {
   })
 
   const outcomes = await Promise.all(renders.map(async ({ slide, payload }) => {
-    const proc     = Bun.spawn(['python3', scriptPath, payload], { stdout: 'ignore', stderr: 'pipe' })
+    const proc     = Bun.spawn([pythonBin(), scriptPath, payload], { stdout: 'ignore', stderr: 'pipe' })
     const exitCode = await proc.exited
     if (exitCode !== 0) {
       return { ok: false as const, slideNumber: slide.slideNumber, stderr: await new Response(proc.stderr).text() }
@@ -910,7 +1022,7 @@ app.post('/api/export-all', async (c) => {
     const pdfPath     = join(slugDir, pdfFilename)
     const pdfPayload  = JSON.stringify(pngPaths)
 
-    const proc = Bun.spawn(['python3', scriptPath, '--pdf', pdfPayload, pdfPath], { stdout: 'ignore', stderr: 'pipe' })
+    const proc = Bun.spawn([pythonBin(), scriptPath, '--pdf', pdfPayload, pdfPath], { stdout: 'ignore', stderr: 'pipe' })
     const exitCode = await proc.exited
     if (exitCode !== 0) {
       const stderr = await new Response(proc.stderr).text()
@@ -979,7 +1091,7 @@ app.post('/api/summary-slide', async (c) => {
   const payload = JSON.stringify({
     ...summary, totalSlides: 1, handle: creatorHandle(), output: outputPath,
   })
-  const proc = Bun.spawn(['python3', join(import.meta.dir, 'generate_slide.py'), payload],
+  const proc = Bun.spawn([pythonBin(), join(import.meta.dir, 'generate_slide.py'), payload],
                          { stdout: 'ignore', stderr: 'pipe' })
   const [code, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
   if (code !== 0) return c.json({ error: `summary render failed: ${stderr}` }, 500)
@@ -997,7 +1109,7 @@ app.post('/api/summary-slide', async (c) => {
     const framed = join(slugDir, 'summary-tiktok.png')
     // Tighter margin than a swipeable carousel: a single card has no
     // neighbouring slides to clear, so it can use more of the frame.
-    const p1 = Bun.spawn(['python3', join(import.meta.dir, 'tiktok_safe.py'), JSON.stringify({
+    const p1 = Bun.spawn([pythonBin(), join(import.meta.dir, 'tiktok_safe.py'), JSON.stringify({
       input: outputPath, output: framed, bgColor: summary.bgColor,
       margin: Math.round(videoMargin * 1080),
     })], { stdout: 'ignore', stderr: 'pipe' })
@@ -1007,7 +1119,7 @@ app.post('/api/summary-slide', async (c) => {
     const bed = resolveAudio(audio)
     hasAudio = !!bed
     const videoPath = join(slugDir, `${slug}-summary.mp4`)
-    const p2 = Bun.spawn(['python3', join(import.meta.dir, 'slides_to_video.py'), JSON.stringify({
+    const p2 = Bun.spawn([pythonBin(), join(import.meta.dir, 'slides_to_video.py'), JSON.stringify({
       inputs: [framed], output: videoPath, perSlide: videoSeconds, coverBoost: 1,
       ...(bed ? { audio: bed } : {}),
     })], { stdout: 'ignore', stderr: 'pipe' })
@@ -1034,7 +1146,7 @@ app.post('/api/summary-slide', async (c) => {
 app.post('/api/check', async (c) => {
   const { slides, strict = false } = await c.req.json()
   if (!Array.isArray(slides)) return c.json({ error: 'slides array is required' }, 400)
-  const proc = Bun.spawn(['python3', join(import.meta.dir, 'check_slides.py'),
+  const proc = Bun.spawn([pythonBin(), join(import.meta.dir, 'check_slides.py'),
                           JSON.stringify({ slides, strict })],
                          { stdout: 'pipe', stderr: 'pipe' })
   const [code, out, err] = await Promise.all([
@@ -1108,7 +1220,7 @@ app.post('/api/export-tiktok', async (c) => {
       input: join(slugDir, name), output: join(outDir, name), bgColor, format,
       ...(margin != null ? { margin } : {}), ...(topBias != null ? { topBias } : {}),
     })
-    const proc = Bun.spawn(['python3', script, payload], { stdout: 'ignore', stderr: 'pipe' })
+    const proc = Bun.spawn([pythonBin(), script, payload], { stdout: 'ignore', stderr: 'pipe' })
     const [code, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
     return code === 0 ? { ok: true as const, name } : { ok: false as const, name, stderr }
   }))
@@ -1158,7 +1270,7 @@ app.post('/api/carousel-video', async (c) => {
     ...(coverBoost != null ? { coverBoost } : {}),
     ...(resolveAudio(audio) ? { audio: resolveAudio(audio) } : {}),
   })
-  const proc = Bun.spawn(['python3', join(import.meta.dir, 'slides_to_video.py'), payload],
+  const proc = Bun.spawn([pythonBin(), join(import.meta.dir, 'slides_to_video.py'), payload],
                          { stdout: 'ignore', stderr: 'pipe' })
   const [code, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()])
   if (code !== 0) return c.json({ error: `carousel video failed: ${stderr}` }, 500)
@@ -1196,7 +1308,7 @@ app.post('/api/slide-video', async (c) => {
     ...slide, handle: creatorHandle(), transparent: true, output: overlayPath,
   })
   const slideScript = join(import.meta.dir, 'generate_slide.py')
-  const overlayProc = Bun.spawn(['python3', slideScript, overlayPayload], { stdout: 'ignore', stderr: 'pipe' })
+  const overlayProc = Bun.spawn([pythonBin(), slideScript, overlayPayload], { stdout: 'ignore', stderr: 'pipe' })
   if (await overlayProc.exited !== 0) {
     return c.json({ error: `overlay render failed: ${await new Response(overlayProc.stderr).text()}` }, 500)
   }
@@ -1209,7 +1321,7 @@ app.post('/api/slide-video', async (c) => {
     audio:   resolveAudio(audio),
     duration, zoom, output: outputPath,
   })
-  const videoProc = Bun.spawn(['python3', join(import.meta.dir, 'slide_video.py'), payload],
+  const videoProc = Bun.spawn([pythonBin(), join(import.meta.dir, 'slide_video.py'), payload],
                        { stdout: 'ignore', stderr: 'pipe' })
   const code = await videoProc.exited
   try { unlinkSync(overlayPath) } catch { /* best effort */ }
@@ -1229,7 +1341,7 @@ app.post('/api/flash-video', async (c) => {
   const outputPath = join(OUTPUT_DIR, filename)
   const payload = JSON.stringify({ ...body, output: outputPath, outputDir: OUTPUT_DIR })
   const scriptPath = join(import.meta.dir, 'flash_video.py')
-  const proc = Bun.spawn(['python3', scriptPath, payload], { stdout: 'ignore', stderr: 'pipe' })
+  const proc = Bun.spawn([pythonBin(), scriptPath, payload], { stdout: 'ignore', stderr: 'pipe' })
   const [exitCode, stderr] = await Promise.all([
     proc.exited, new Response(proc.stderr).text(),
   ])
@@ -1526,4 +1638,34 @@ app.get('*', async (c) => {
 })
 
 console.log('🎨 Carousel Studio server running on http://localhost:3010')
+
+// Say at startup what would otherwise only surface as a stack trace at export
+// time. Which interpreter, and what it renders with — FreeType and Raqm decide
+// how type is rasterised and shaped, so two machines on the same Pillow can
+// still export different pixels.
+{
+  const py = python()
+  if (py) {
+    const shaping = py.raqm ? `raqm ${py.raqm}` : 'no raqm'
+    console.log(`   python ${py.version} (${py.bin}) · Pillow ${py.pillow} · ` +
+                `freetype ${py.freetype ?? '?'} · ${shaping}`)
+    // Falling through past a configured interpreter is the right behaviour, but
+    // doing it silently would leave you reading a settings file that is not
+    // being obeyed and no way to tell.
+    const wanted = (readSettings().pythonPath || '').trim()
+    if (wanted && expandPath(wanted) !== py.bin) {
+      console.log(`   ⚠  pythonPath is set to ${wanted}, but that cannot import Pillow — using ${py.bin} instead`)
+    }
+    if (!hasFfmpeg()) console.log('   ffmpeg not found — video export unavailable, PNG and PDF are fine')
+  } else {
+    console.log('')
+    console.log('   ⚠  No Python with Pillow found. Rendering will fail.')
+    console.log(`      Looked at: ${pythonCandidates().join(', ')}`)
+    console.log('      Fix: pip install -r requirements.txt')
+    console.log('      Or point at a specific one: "pythonPath" in settings.json,')
+    console.log('      or the CAROUSEL_PYTHON environment variable.')
+    console.log('')
+  }
+}
+
 export default { port: 3010, fetch: app.fetch }

@@ -74,6 +74,17 @@ cp settings.example.json settings.json
 | `communityUrl` | Link shown on video footers. Omitted if unset. |
 | `likenessPath` | A photo of you, used as a reference image for generation. |
 | `likenessDescription` | Appended to image prompts so the model gets you right. |
+| `pythonPath` | The interpreter that renders slides. Unset, the first one that can import Pillow wins. |
+
+If you have more than one Python, set `pythonPath`. The app does not trust
+`python3` to mean the same thing tomorrow — installing anything that pulls in a
+Python can put a new interpreter ahead of the one Pillow lives in. `GET
+/api/health` reports which one was chosen, what it renders with, and whether
+ffmpeg is present.
+
+Different builds of the same Pillow version link different FreeType versions,
+and that changes exported pixels. If you care about slides staying consistent
+with ones you have already posted, pin the interpreter.
 
 ## Themes
 

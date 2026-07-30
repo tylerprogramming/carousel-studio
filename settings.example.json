@@ -6,5 +6,6 @@
   "likenessPath": "Optional. Absolute path to a photo of you, used as a reference image when 'Use my likeness' is checked.",
   "likenessDescription": "Optional. Appended to the image prompt so the model gets your appearance right, e.g. 'The person in the image is a young adult male. Always generate a male person, not female.'",
   "communityUrl": "Optional. Community or link-in-bio URL shown on flash-video footers, e.g. 'skool.com/your-community'. Left blank, the line is omitted.",
-  "audioPath": "Optional. Default audio bed for generated videos, e.g. 'audio/my-bed.mp3'. Relative to the app, or absolute. Supports ~."
+  "audioPath": "Optional. Default audio bed for generated videos, e.g. 'audio/my-bed.mp3'. Relative to the app, or absolute. Supports ~.",
+  "pythonPath": "Optional. The interpreter that renders slides, e.g. '/usr/bin/python3'. Left blank, the first one that can import Pillow is used. Set it when you have several Pythons and want a specific one — different builds ship different FreeType versions, which changes exported pixels."
 }

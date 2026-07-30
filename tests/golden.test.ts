@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { spawnSync } from 'bun'
 import { join } from 'path'
-import { ROOT } from './helpers'
+import { ROOT, python } from './helpers'
 
 /**
  * The exporter, against renders that are known to be right.
@@ -22,13 +22,18 @@ interface Report {
   error?: string
   skipped?: boolean
   reason?: string
+  likely_cause?: string
+  note?: string
   expected?: Provenance
   actual?: Provenance
   thresholds?: object
   slides?: SlideResult[]
 }
 
-const proc = spawnSync(['python3', join(ROOT, 'tests', 'golden.py'), 'compare'], { cwd: ROOT })
+// Resolved, not the literal 'python3' — golden.py renders through sys.executable,
+// so which interpreter starts it decides which Pillow and FreeType the pixels
+// come from.
+const proc = spawnSync([python(), join(ROOT, 'tests', 'golden.py'), 'compare'], { cwd: ROOT })
 const report: Report = JSON.parse(proc.stdout.toString() || '{}')
 
 /**
@@ -60,12 +65,15 @@ describe.skipIf(!!report.skipped)('golden renders', () => {
   for (const slide of report.slides ?? []) {
     test(`${slide.name} renders as committed`, () => {
       if (slide.status !== 'ok') {
-        // Bun prints the message on failure, so put the numbers and the way
-        // out in it rather than leaving "expected ok, got changed".
+        // Bun prints the message on failure, so put the numbers, the likely
+        // cause and the way out in it rather than leaving "expected ok, got
+        // changed".
         const detail = `${slide.name}: ${slide.status} ` +
           `(soft ${slide.soft}, hard ${slide.hard}). ` +
-          `Look at tests/fixtures/golden/_failed/, then if the change is ` +
-          `intended run: bun run test:golden:update`
+          (report.likely_cause
+            ? report.likely_cause
+            : `Look at tests/fixtures/golden/_failed/, then if the change is ` +
+              `intended run: bun run test:golden:update`)
         expect(detail).toBe(`${slide.name}: ok`)
       }
       expect(slide.status).toBe('ok')

@@ -78,12 +78,27 @@ def provenance() -> dict:
     "you are on a platform these were not made on" is a skip, and "you are on
     the right platform but something underneath moved" is a real failure worth
     looking at. Without it both arrive as an unexplained pixel diff.
+
+    The first version of this recorded the Pillow version and stopped, on the
+    assumption that it determined rendering. It does not. Pillow is a wrapper:
+    FreeType rasterises the glyphs and Raqm shapes the runs, both are linked in
+    at build time, and both move independently of the version on the tin. A
+    Homebrew Pillow 12.3.0 and a pip Pillow 12.3.0 can disagree.
+
+    Measured on this deck, going from FreeType 2.13.3 with no Raqm to 2.14.3
+    with Raqm 0.11.0 moved 1.15% of pixels — 50x the failure threshold. Roughly
+    a third of that was Raqm's shaping and the rest was FreeType alone. Neither
+    is visible in `PIL.__version__`.
     """
     sys.path.insert(0, str(ROOT))
     import generate_slide as g
+    from PIL import features
     return {
         'platform': platform.system().lower(),
         'pillow': PIL.__version__,
+        # The two that actually draw the glyphs.
+        'freetype': features.version('freetype2'),
+        'raqm': features.version('raqm'),
         'mono': g.load_mono(29).getname()[0],
     }
 
@@ -103,7 +118,13 @@ def render(slides, into: Path) -> dict:
                    'handle': '@fixture',
                    'totalSlides': len(slides),
                    'output': str(into / name)}
-        proc = subprocess.run(['python3', str(ROOT / 'generate_slide.py'), json.dumps(payload)],
+        # sys.executable, not 'python3'. This script reports the Pillow and
+        # FreeType of the interpreter running it, and then had the renderer
+        # spawned by whatever 'python3' happened to mean — so on a machine with
+        # two Pythons it would record one environment's provenance against
+        # another's pixels, and `python3.9 golden.py update` would silently not
+        # do what it said. Same bug the server had at fourteen call sites.
+        proc = subprocess.run([sys.executable, str(ROOT / 'generate_slide.py'), json.dumps(payload)],
                               capture_output=True, text=True, cwd=ROOT)
         if proc.returncode != 0:
             raise SystemExit(f'render failed for {name}:\n{proc.stderr}')
@@ -155,26 +176,26 @@ def compare() -> dict:
 
     now = provenance()
     was = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else None
-    if was:
-        # A different OS resolves a different mono font, so these renders cannot
-        # be reproduced here. That is not a regression and must not read as one:
-        # a test that fails for a reason the reader cannot act on is a test that
-        # gets muted.
-        if was.get('platform') != now['platform']:
-            return {'ok': True, 'skipped': True, 'expected': was, 'actual': now,
-                    'reason': f"goldens were rendered on {was.get('platform')}, "
-                              f"this is {now['platform']}"}
-        # Same OS, but something underneath moved. That does change the PNGs you
-        # post, so it is a failure — and naming it beats an unexplained diff.
-        drifted = [k for k in ('pillow', 'mono') if was.get(k) != now[k]]
-        if drifted:
-            return {'ok': False, 'expected': was, 'actual': now,
-                    'error': 'the goldens were rendered with ' +
-                             ', '.join(f'{k} {was.get(k)}' for k in drifted) +
-                             ', this run has ' +
-                             ', '.join(f'{k} {now[k]}' for k in drifted) +
-                             '. That changes exported slides. Check them, then: '
-                             'bun run test:golden:update'}
+
+    # A different OS resolves a different mono font, so these renders cannot be
+    # reproduced here at all. That is not a regression and must not read as one:
+    # a test that fails for a reason the reader cannot act on is a test that
+    # gets muted.
+    if was and was.get('platform') != now['platform']:
+        return {'ok': True, 'skipped': True, 'expected': was, 'actual': now,
+                'reason': f"goldens were rendered on {was.get('platform')}, "
+                          f"this is {now['platform']}"}
+
+    # Everything else about the environment is diagnosis, not a gate.
+    #
+    # This used to fail outright on any difference, which had it backwards. The
+    # pixels are the thing under test; the library versions are just the best
+    # available explanation for why they moved. Gating on them means a FreeType
+    # patch release that does not shift a single pixel turns the suite red, and
+    # that is how a suite stops being trusted. So: always compare the renders,
+    # and if they differ, say what underneath is likely responsible.
+    drifted = [k for k in ('pillow', 'freetype', 'raqm', 'mono')
+               if was and was.get(k) != now[k]]
 
     shutil.rmtree(FAILED, ignore_errors=True)   # last run's artifacts are not this run's
     tmp = Path(tempfile.mkdtemp(prefix='golden-'))
@@ -193,10 +214,28 @@ def compare() -> dict:
         for orphan in sorted(p.name for p in GOLDEN.glob('*.png') if p.name not in rendered):
             results.append({'name': orphan, 'status': 'orphan_golden', 'soft': 0, 'hard': 0})
 
-        return {'ok': all(r['status'] == 'ok' for r in results),
-                'rendered_with': now,
-                'thresholds': {'soft': MAX_SOFT_RATIO, 'hard': MAX_HARD_RATIO},
-                'slides': results}
+        ok = all(r['status'] == 'ok' for r in results)
+        out = {'ok': ok,
+               'rendered_with': now,
+               'thresholds': {'soft': MAX_SOFT_RATIO, 'hard': MAX_HARD_RATIO},
+               'slides': results}
+
+        if drifted and not ok:
+            # The renders moved and the environment moved. Say which, so the
+            # first question — "is this my change or my machine?" — is already
+            # answered.
+            out['likely_cause'] = (
+                'the environment changed: ' +
+                ', '.join(f'{k} {was.get(k)} -> {now[k]}' for k in drifted) +
+                '. If the slides still read correctly this is not a regression '
+                '— check them, then: bun run test:golden:update')
+            out['expected_env'] = was
+        elif drifted:
+            # Different libraries, identical pixels. Worth saying out loud,
+            # because it is evidence the thresholds are not too tight.
+            out['note'] = ('environment differs but renders match: ' +
+                           ', '.join(f'{k} {was.get(k)} -> {now[k]}' for k in drifted))
+        return out
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
