@@ -1,0 +1,73 @@
+name: Render or export problem
+description: A slide renders wrong, exports wrong, or does not export at all
+labels: [render]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most render bugs come down to which Python is being used and what it
+        links against, so the health output below usually answers the question
+        outright. Please paste it even if it looks boring.
+
+  - type: textarea
+    id: health
+    attributes:
+      label: /api/health
+      description: |
+        With the app running, open <http://localhost:3010/api/health> and paste
+        the whole thing. It reports the interpreter, Pillow, FreeType, Raqm and
+        ffmpeg. Nothing in it is personal.
+      render: json
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected on the slide, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: slide
+    attributes:
+      label: The slide
+      description: |
+        The slide's JSON if you have it — headline, variant, type, terminalLines
+        and textScale are the fields that usually matter. Redact any copy you do
+        not want public.
+      render: json
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where is it wrong
+      options:
+        - The exported PNG
+        - The preview in the editor
+        - Both, and they disagree with each other
+        - Both, and they agree but are wrong
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        **"They disagree with each other"** is the most useful answer you can
+        give — it means the renderer and the preview have drifted, which is the
+        one thing this project treats as a contract.
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: The export, the preview, or both side by side.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From `package.json`, or the commit you are on.
+    validations:
+      required: true

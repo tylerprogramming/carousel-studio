@@ -197,6 +197,12 @@ exports/my-carousel/
 
 Point `exportDir` at a content repo to write straight into it.
 
+## Contributing
+
+[`CONTRIBUTING.md`](CONTRIBUTING.md) — setup, the parity contract, and what to
+do when the golden tests fail. A new look is usually a theme and a new structure
+is usually a framework; both are one JSON file and need no code.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in the app does not work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For anything about how a slide *looks* or *exports*, use the
+        "Render or export problem" template instead — it asks for the one thing
+        that usually explains those.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce it
+      description: Steps, if it is reproducible. Say so if it is not.
+      placeholder: |
+        1. Generate a carousel with the … framework
+        2. Switch the platform to TikTok
+        3. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: errors
+    attributes:
+      label: Errors
+      description: |
+        Anything in the terminal running the server, and anything in the browser
+        console. The server prints a banner at startup that is worth including.
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From `package.json`, or the commit you are on.
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: OS and Bun version
+      placeholder: macOS 15.2, Bun 1.3.14

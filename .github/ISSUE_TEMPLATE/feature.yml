@@ -1,0 +1,40 @@
+name: Feature or change
+description: Suggest something the app should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening this: a new **look** is usually a theme, and a new
+        **structure** is usually a framework. Both are one JSON file and need no
+        code — see `themes/README.md` and `frameworks/`. Worth checking whether
+        one of those already covers it.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is hard right now
+      description: |
+        The problem rather than the solution. What were you doing, and where did
+        it get awkward?
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+      description: Optional. A sketch, a rough shape, or nothing at all.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Roughly where
+      multiple: true
+      options:
+        - Editor / UI
+        - The renderer and export
+        - Generation (copy, captions, images)
+        - Video
+        - Themes or frameworks
+        - Not sure
