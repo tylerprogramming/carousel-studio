@@ -1,5 +1,51 @@
 # Changelog
 
+## 2.1.8
+
+**No CDN.** The README's first claim was that nothing leaves your machine
+except calls to the model provider you configure, and every page load hit
+fonts.googleapis.com. Inter and JetBrains Mono are now declared as `@font-face`
+against the same files in `fonts/` that the renderer draws with, so the editor
+makes no third-party request and works with the network off. Verified in a
+browser against the production build: nine requests on load, all to localhost.
+
+It was also a parity hole. The exporter used the vendored Inter while the
+browser used Google's — the same face, not guaranteed the same cut, and nothing
+in the test suite could have caught them diverging because the goldens only
+exercise the Python side. With the CDN unreachable the UI fell back to
+system-ui while exports stayed Inter, so the preview stopped being a preview at
+the moment you were least able to tell.
+
+Inter's optical-size axis is pinned to match. It runs 14 to 32 and browsers
+default to `font-optical-sizing: auto`, so a 118px headline was drawn with a
+display cut — but the renderer pins the axis at 14 for every size. The preview
+was letting the browser reshape type the exporter never reshapes.
+
+**The app finds a Python that can render** instead of spawning the literal
+`python3` at fourteen call sites. That name means "whatever is first on PATH
+right now", and it moves: a Homebrew Python arrived here as somebody else's
+dependency, took the name, and rendering broke silently — the server started,
+the editor loaded, and the next export would have failed with an ImportError in
+a toast. Set `pythonPath` in settings.json to pin one, or `CAROUSEL_PYTHON` to
+override for a single run. A configured interpreter that cannot import Pillow
+is skipped with a warning rather than obeyed in silence.
+
+**The editor says so before you start.** A banner reports when no Python with
+Pillow was found, listing what was tried, and separately when ffmpeg is missing
+— video only, PNG and PDF are unaffected. It renders nothing when everything is
+present. `GET /api/health` answers the same question over HTTP.
+
+**Example slides and the editor are in the README**, composed from the golden
+fixtures so the picture is the renderer's verified output rather than an old
+screenshot.
+
+The golden manifest records FreeType and Raqm alongside Pillow, because Pillow's
+version does not determine rendering — it wraps them, they are linked at build
+time, and they move independently. Measured here, FreeType 2.13.3 without Raqm
+against 2.14.3 with it moved 1.15% of pixels, fifty times the failure
+threshold. That provenance now explains a pixel failure rather than gating on
+one, so a patch release that shifts nothing no longer turns the suite red.
+
 ## 2.1.7
 
 **The terminal variant exported in a sans face on Linux and Windows.**
