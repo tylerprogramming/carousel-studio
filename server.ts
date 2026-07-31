@@ -11,6 +11,7 @@ import {
 import { creatorHandle, loadEnv, readSettings, writeSettings } from './lib/settings'
 import { MIME, mediaType, pngSize, slugFromTitle } from './lib/media'
 import { FONTS_DIR, fontPayload, listFonts } from './lib/fonts'
+import { seedExamples } from './lib/examples'
 import {
   hasFfmpeg, python, pythonBin, pythonCandidates, reportPython,
 } from './lib/python'
@@ -25,6 +26,10 @@ app.use('*', cors())
 
 ensureDirs()
 loadEnv()
+
+// A fresh clone has no carousels, so the editor opened on nothing at all. Only
+// ever fills an empty directory — see lib/examples.ts.
+const seeded = seedExamples()
 
 // ── App Settings (likeness path, etc.) ───────────────────────────────────────
 
@@ -687,8 +692,11 @@ app.get('*', async (c) => {
 // route tests do, to drive app.fetch without binding a port — should not print
 // a banner into the test output.
 if (import.meta.main) {
-  console.log('🎨 Carousel Studio server running on http://localhost:3010')
+  console.log('🎨 Social Studio running on http://localhost:3010')
   reportPython()
+  if (seeded.length) {
+    console.log(`   added ${seeded.length} example carousel${seeded.length > 1 ? 's' : ''} to get you started`)
+  }
 }
 
 export default { port: 3010, fetch: app.fetch }

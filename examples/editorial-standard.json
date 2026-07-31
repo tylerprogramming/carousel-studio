@@ -1,0 +1,82 @@
+{
+  "id": "example_editorial_standard",
+  "title": "What makes a carousel readable",
+  "platform": "instagram",
+  "example": true,
+  "slides": [
+    {
+      "id": "ex2-1",
+      "slideNumber": 1,
+      "type": "cover",
+      "variant": "standard",
+      "headline": "What makes a carousel readable",
+      "emphasisLine": "Four things, none of them design",
+      "bodyText": "The second example deck. This one uses the standard layout rather than the terminal one.",
+      "bgColor": "#F5F0EB",
+      "textColor": "#1B1B1B",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "ex2-2",
+      "slideNumber": 2,
+      "type": "content",
+      "variant": "standard",
+      "stepNumber": 1,
+      "headline": "One idea per slide",
+      "emphasisLine": "If it needs a comma, it needs two slides",
+      "bodyText": "A slide is read in about a second and a half. Two ideas on one slide means one of them is skipped.",
+      "bgColor": "#F5F0EB",
+      "textColor": "#1B1B1B",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "ex2-3",
+      "slideNumber": 3,
+      "type": "content",
+      "variant": "standard",
+      "stepNumber": 2,
+      "headline": "Front-load the headline",
+      "emphasisLine": "The first three words do the work",
+      "bodyText": "People decide whether to swipe from the top line alone. Everything below it is for the ones who already did.",
+      "bgColor": "#F5F0EB",
+      "textColor": "#1B1B1B",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "ex2-4",
+      "slideNumber": 4,
+      "type": "content",
+      "variant": "standard",
+      "stepNumber": 3,
+      "headline": "Contrast beats decoration",
+      "emphasisLine": "It is read at thumbnail size first",
+      "bodyText": "Anything under 4.5:1 disappears in the feed. The checker flags it before you export.",
+      "bgColor": "#F5F0EB",
+      "textColor": "#1B1B1B",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "ex2-5",
+      "slideNumber": 5,
+      "type": "cta",
+      "variant": "standard",
+      "headline": "Try changing something",
+      "emphasisLine": "Shift-click any control to apply it to every slide",
+      "bgColor": "#F5F0EB",
+      "textColor": "#1B1B1B",
+      "accentColor": "#E07355"
+    }
+  ],
+  "captions": {
+    "instagram": "Four things that decide whether a carousel gets read, and none of them are design choices.\n\nOne idea per slide. Front-load the headline. Contrast over decoration. Check it before you post.\n\nThis is an example deck included with Social Studio. Change it and watch the preview keep up.",
+    "hashtags": ["#carousel", "#contentdesign", "#creatortools", "#opensource", "#socialmedia"],
+    "linkedin": "Four things that decide whether a carousel is read, none of which are design choices.\n\nOne idea per slide, because a slide gets about a second and a half. The headline front-loaded, because that is what the swipe decision is made on. Contrast over decoration, because it is seen at thumbnail size first.\n\nAn example deck included with Social Studio, an open source tool for building carousels, slideshows and Reels locally.",
+    "altText": [
+      "Slide 1 of 5. What makes a carousel readable. Four things, none of them design. The second example deck. This one uses the standard layout rather than the terminal one.",
+      "Slide 2 of 5. Step 1: One idea per slide. If it needs a comma, it needs two slides. A slide is read in about a second and a half.",
+      "Slide 3 of 5. Step 2: Front-load the headline. The first three words do the work. People decide whether to swipe from the top line alone.",
+      "Slide 4 of 5. Step 3: Contrast beats decoration. It is read at thumbnail size first. Anything under 4.5 to 1 disappears in the feed.",
+      "Slide 5 of 5. Try changing something. Shift-click any control to apply it to every slide."
+    ]
+  }
+}

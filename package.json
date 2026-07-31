@@ -1,7 +1,8 @@
 {
-  "name": "carousel-studio",
+  "name": "social-studio",
   "version": "2.2.0",
   "scripts": {
+    "setup": "bun scripts/setup.ts",
     "dev": "concurrently \"bun run server\" \"bun run client\"",
     "server": "bun --watch server.ts",
     "client": "cd client && bun run dev",
@@ -20,6 +21,6 @@
     "@types/bun": "^1.3.14",
     "typescript": "^5.7.3"
   },
-  "description": "Design, generate and export Instagram/TikTok carousels. Bring your own API keys.",
+  "description": "Design, generate and export carousels, TikTok slideshows and Reels for Instagram, TikTok and LinkedIn. Bring your own API keys.",
   "license": "MIT"
 }

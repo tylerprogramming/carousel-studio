@@ -11,8 +11,8 @@ golden tests treat your machine.
 ## Setup
 
 ```bash
-git clone https://github.com/tylerprogramming/carousel-studio.git
-cd carousel-studio
+git clone https://github.com/tylerprogramming/social-studio.git
+cd social-studio
 bun install && (cd client && bun install)
 pip install -r requirements.txt
 

@@ -1,5 +1,5 @@
 blank_issues_enabled: true
 contact_links:
   - name: Renderer parity, tests and goldens
-    url: https://github.com/tylerprogramming/carousel-studio/blob/main/CONTRIBUTING.md
+    url: https://github.com/tylerprogramming/social-studio/blob/main/CONTRIBUTING.md
     about: How the preview and the exporter stay in step, and what to do when the golden tests fail.

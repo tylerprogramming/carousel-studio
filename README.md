@@ -1,7 +1,8 @@
-# Carousel Studio
+# Social Studio
 
-Build branded carousels for Instagram, TikTok and LinkedIn. AI writes the copy,
-you control the design, and the export matches what you saw on screen.
+Build branded carousels, TikTok slideshows and Reels for Instagram, TikTok and
+LinkedIn. AI writes the copy, you control the design, and the export matches
+what you saw on screen.
 
 Runs locally. Bring your own API keys — nothing goes anywhere except the model
 provider you configure. No CDN, no telemetry, no font requests; the editor
@@ -10,7 +11,7 @@ works with the network off.
 ![Version](https://img.shields.io/badge/version-2.2.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Bun](https://img.shields.io/badge/runtime-Bun-black)
-[![CI](https://github.com/tylerprogramming/carousel-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/tylerprogramming/carousel-studio/actions/workflows/ci.yml)
+[![CI](https://github.com/tylerprogramming/social-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/tylerprogramming/social-studio/actions/workflows/ci.yml)
 
 ![Three exported slides: a cover, a step with a terminal window, and a call to action](docs/slides.png)
 
@@ -40,18 +41,28 @@ suite holds the renderer to, so this picture cannot drift from what you get.
 
 ## Quickstart
 
-**You need** [Bun](https://bun.sh) 1.1+, Python 3.9+, and Pillow. `ffmpeg` only
-if you want video — PNG and PDF work without it.
+**You need** [Bun](https://bun.sh) 1.1+ and Python 3.9+. Everything else `setup`
+handles or tells you how to get.
 
 ```bash
-git clone https://github.com/tylerprogramming/carousel-studio.git
-cd carousel-studio
-bun install && (cd client && bun install)
-pip install -r requirements.txt
-
-cp .env.example .env      # add at least ANTHROPIC_API_KEY
+git clone https://github.com/tylerprogramming/social-studio.git
+cd social-studio
+bun run setup             # checks what you have, installs the rest
 bun run dev               # http://localhost:5175
 ```
+
+`setup` installs the dependencies and Pillow, writes `settings.json` and `.env`,
+and tells you exactly what to run if Python or ffmpeg is missing. It never
+installs a language runtime for you and never overwrites config you already have.
+
+**It opens with two example carousels**, so there is something on screen before
+you have typed anything. They are ordinary decks — edit them, or delete them.
+
+### You do not need an API key
+
+Editing, rendering, exporting, themes, custom fonts and alt text all work with
+no key at all. A key is only needed for Claude to *write* slide copy and
+captions. `ffmpeg` is only needed for video; PNG and PDF do not touch it.
 
 Production: `bun run build && bun run start`, then http://localhost:3010.
 
@@ -160,7 +171,9 @@ Same idea, different job.
 
 ```
 server.ts              Hono app: settings, themes, carousels, rendering, libraries
-lib/                   Paths, settings, the Python resolver, media types
+lib/                   Paths, settings, the Python resolver, media types, fonts, alt text
+examples/              Example carousels, copied in on an empty first run
+scripts/setup.ts       bun run setup
 routes/                ai.ts (copy + captions), jobs.ts (image queue),
                        renditions.ts (TikTok reframe, video)
 generate_slide.py      Slide renderer + PDF combiner  -- twin of SlidePreview.tsx

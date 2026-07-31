@@ -1,0 +1,89 @@
+{
+  "id": "example_terminal_walkthrough",
+  "title": "Four commands, no editor",
+  "platform": "instagram",
+  "example": true,
+  "slides": [
+    {
+      "id": "ex1-1",
+      "slideNumber": 1,
+      "type": "cover",
+      "variant": "terminal",
+      "headline": "Four commands, no editor",
+      "emphasisLine": "No timeline. No scrubbing.",
+      "bodyText": "These are not advanced. They are just not obvious when you start.",
+      "bgColor": "#12141A",
+      "textColor": "#EEECE8",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "ex1-2",
+      "slideNumber": 2,
+      "type": "content",
+      "variant": "terminal",
+      "stepNumber": 1,
+      "headline": "Pull the transcript",
+      "emphasisLine": "Whisper, locally",
+      "terminalLines": [
+        "$ transcribe clip.mp4",
+        "  -> clip.srt written in 12s",
+        "$ head -3 clip.srt"
+      ],
+      "bgColor": "#12141A",
+      "textColor": "#EEECE8",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "ex1-3",
+      "slideNumber": 3,
+      "type": "content",
+      "variant": "terminal",
+      "stepNumber": 2,
+      "headline": "Cut the dead air",
+      "bodyText": "Silence removal runs on the transcript, not the waveform, so it never clips the start of a word.",
+      "bgColor": "#12141A",
+      "textColor": "#EEECE8",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "ex1-4",
+      "slideNumber": 4,
+      "type": "content",
+      "variant": "terminal",
+      "stepNumber": 3,
+      "headline": "Check before you post",
+      "emphasisLine": "Catch it here, not there",
+      "terminalLines": [
+        "$ check slides.json",
+        "  ! slide 3: headline clipped",
+        "  ok: 4 of 5"
+      ],
+      "bgColor": "#12141A",
+      "textColor": "#EEECE8",
+      "accentColor": "#E07355"
+    },
+    {
+      "id": "ex1-5",
+      "slideNumber": 5,
+      "type": "cta",
+      "variant": "terminal",
+      "headline": "This deck is an example",
+      "emphasisLine": "Edit it, or start a new one",
+      "bgColor": "#12141A",
+      "textColor": "#EEECE8",
+      "accentColor": "#E07355"
+    }
+  ],
+  "captions": {
+    "instagram": "Most editing time goes on things a command already does.\n\nTranscribe first. Cut on the transcript, not the waveform. Check before you post, not after.\n\nThis is an example carousel that ships with Social Studio. Edit it, delete it, or use it as a starting point.",
+    "hashtags": ["#videoediting", "#automation", "#creatortools", "#opensource", "#workflow"],
+    "linkedin": "Editing time tends to go on work that is already automatable.\n\nWorking from a transcript rather than a waveform means a cut never lands mid-word, and a pre-publish check catches the clipped headline before an audience does rather than after.\n\nThis is an example carousel included with Social Studio, an open source tool for building carousels, slideshows and Reels locally.",
+    "altText": [
+      "Slide 1 of 5. Four commands, no editor. No timeline. No scrubbing. These are not advanced. They are just not obvious when you start.",
+      "Slide 2 of 5. Step 1: Pull the transcript. Whisper, locally. Terminal showing: $ transcribe clip.mp4; -> clip.srt written in 12s; $ head -3 clip.srt.",
+      "Slide 3 of 5. Step 2: Cut the dead air. Silence removal runs on the transcript, not the waveform, so it never clips the start of a word.",
+      "Slide 4 of 5. Step 3: Check before you post. Catch it here, not there. Terminal showing: $ check slides.json; ! slide 3: headline clipped; ok: 4 of 5.",
+      "Slide 5 of 5. This deck is an example. Edit it, or start a new one."
+    ]
+  }
+}
