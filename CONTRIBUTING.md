@@ -117,6 +117,13 @@ editing the renderer to get a different style, a theme may be the better answer.
 CI runs typecheck, the three suites on Linux, the goldens on macOS, and imports
 every Python script on 3.9 and 3.13. Green is expected before review.
 
+## Decisions
+
+`docs/decisions/` records the reasoning behind choices that were argued about —
+including what was measured rather than assumed. Worth reading before proposing
+a change to how the app is installed or how the renderer works; the answer may
+already be there, with numbers.
+
 ## Reporting a bug
 
 Use the templates — they ask for `/api/health` output on render bugs, which
