@@ -8,7 +8,7 @@ Runs locally. Bring your own API keys — nothing goes anywhere except the model
 provider you configure. No CDN, no telemetry, no font requests; the editor
 works with the network off.
 
-![Version](https://img.shields.io/badge/version-2.2.0-blue)
+![Version](https://img.shields.io/badge/version-2.3.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Bun](https://img.shields.io/badge/runtime-Bun-black)
 [![CI](https://github.com/tylerprogramming/social-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/tylerprogramming/social-studio/actions/workflows/ci.yml)

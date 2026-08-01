@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.3.0
+
+**Carousel Studio is now Social Studio.** The old name described the first thing
+it did. It makes TikTok slideshows, Reels, carousel videos, captions and alt
+text as well, and had done for a while. GitHub redirects the old URL, so nothing
+breaks for anyone who cloned it.
+
+**`bun run setup`** replaces six commands across two README blocks with one. It
+installs what is the app's business — dependencies, Pillow — and *directs* for
+what is not: a language runtime does not get quietly installed on your machine,
+so when Python is missing it prints the command for your platform and stops.
+Same for ffmpeg, which is optional anyway. Existing `settings.json` and `.env`
+are never overwritten.
+
+**Two example carousels** ship in `examples/` and are copied in when
+`carousels/` is empty. A fresh clone used to open on an empty editor: two
+runtimes installed, a key added, and nothing on screen to say what the tool does
+or what a good deck looks like. They are ordinary decks with captions and alt
+text — edit them, delete them, or start from them. Only ever copied into an
+empty directory, so deleting one keeps it deleted.
+
+**You do not need an API key**, which was true the whole time and never written
+down. Editing, rendering, exporting, themes, custom fonts and alt text all work
+without one. A key is only for having Claude *write* copy. An empty
+`ANTHROPIC_API_KEY` reads as "this does not work yet" when in fact almost
+everything does.
+
 ## 2.2.0
 
 **Bring your own typeface.** A branded content tool that cannot use your brand's
