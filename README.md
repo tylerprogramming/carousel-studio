@@ -81,6 +81,12 @@ Real environment variables win over `.env`. If you use Claude Code, keys in
 
 ### Make it yours
 
+**Settings** in the header covers the ones that change what you see — handle,
+typefaces, brand voice, export folder — and reports whether this machine can
+render slides and video. Nothing needs a restart.
+
+The rest live in `settings.json`:
+
 ```bash
 cp settings.example.json settings.json
 ```

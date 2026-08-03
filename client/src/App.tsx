@@ -18,6 +18,7 @@ import JobStrip from './components/JobStrip'
 import HealthBanner from './components/HealthBanner'
 import FlashVideoModal from './components/FlashVideoModal'
 import SummarySlideModal from './components/SummarySlideModal'
+import SettingsModal from './components/SettingsModal'
 import ReadinessRail from './components/ReadinessRail'
 import CheckBadge from './components/CheckBadge'
 import {
@@ -68,6 +69,7 @@ export default function App() {
   const [showExports, setShowExports]   = useState(false)
   const [showFlash, setShowFlash]       = useState(false)
   const [showSummary, setShowSummary]   = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [exportFormat, setExportFormat] = useState<'png' | 'pdf' | 'both'>('both')
   const [mobileTab, setMobileTab]       = useState<MobileTab>('preview')
   const [saveStatus, setSaveStatus]     = useState<'saved' | 'unsaved' | 'saving'>('saved')
@@ -455,6 +457,10 @@ export default function App() {
           </button>
           {/* One slide as a standalone Reel. Retired in 2.1.x and brought back
               because flash_video.py never stopped being used. */}
+          <button onClick={() => setShowSettings(true)} title="Settings"
+            className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-brand hover:text-brand">
+            Settings
+          </button>
           <button onClick={() => setShowFlash(true)} title="Make a Reel from this slide"
             className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:border-brand hover:text-brand">
             Reel
@@ -570,6 +576,7 @@ export default function App() {
       {/* Below 1200px the editor row isn't rendered, so there is no column to
           dock into and Exports falls back to covering the screen. */}
       {showExports && isMobile && <ExportsGallery onClose={() => setShowExports(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showSummary && (
         <SummarySlideModal
           carouselId={carouselId}
