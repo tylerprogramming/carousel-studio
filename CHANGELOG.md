@@ -1,5 +1,48 @@
 # Changelog
 
+## 2.4.0
+
+**Four features that already worked can now be reached.** Each of these shipped
+in every release with no way into it from the app — a route with no caller
+still passes CI, so nothing caught them.
+
+- **Reel.** One slide as a standalone 1080x1920 clip. The UI was retired in
+  2.1.x and `flash_video.py` was left in place, so Reels kept being made from
+  the command line while the app pretended the feature was gone. Prefilled from
+  the slide you are on; style picks itself from the variant; duration defaults
+  to five seconds and adjusts from two to fifteen.
+- **Slide video**, in the Image tab, because it composites the slide's own
+  furniture over the slide's own background and that is where backgrounds are
+  set. Writes `slide_N.mp4` beside the exported PNGs so one Instagram post stays
+  one folder, with slide 1 moving while the rest hold. A still gets a slow
+  push-in. It only offers itself when there is a background to move.
+- **Summary card.** Every slide's takeaway on one frame. The points are shown
+  and editable *before* rendering: an automatic summary is right most of the
+  time and wrong in a way you only notice on reading it, so judging after the
+  render wastes it.
+- **Settings.** There was no settings screen at all — `saveSettings` existed and
+  nothing called it, so the handle printed on every slide, the export folder and
+  the typefaces all meant editing JSON by hand and restarting. This is why
+  custom fonts had been unreachable since 2.2.0: the feature worked in both
+  halves of the renderer and there was no way to switch it on. It also reports,
+  read-only, whether this machine can render slides and video.
+
+**Where the code lives is now separate from where your work lives.** The app
+wrote carousels, exports, images, audio and `settings.json` under the directory
+the code is in. Correct for a clone, wrong for anything else — installed from
+npm that is inside `node_modules`, so your carousels would have lived there and
+gone on the next upgrade.
+
+`DATA_ROOT` is the clone itself unless the app is running from under
+`node_modules`, detected rather than guessed: moving an existing checkout's
+carousels would be a worse bug than the one being fixed. `SOCIAL_STUDIO_DATA`
+overrides. Nothing moves for anyone with a clone.
+
+`fonts/` needed the same split for a subtler reason — it holds the vendored
+faces *and* anything you drop in, so installed, your own typeface would have sat
+in `node_modules` waiting to be deleted. Both directories are searched, yours
+first.
+
 ## 2.3.0
 
 **Carousel Studio is now Social Studio.** The old name described the first thing
