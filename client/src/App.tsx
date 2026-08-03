@@ -17,6 +17,7 @@ import ExportsGallery from './components/ExportsGallery'
 import JobStrip from './components/JobStrip'
 import HealthBanner from './components/HealthBanner'
 import FlashVideoModal from './components/FlashVideoModal'
+import SummarySlideModal from './components/SummarySlideModal'
 import ReadinessRail from './components/ReadinessRail'
 import CheckBadge from './components/CheckBadge'
 import {
@@ -66,6 +67,7 @@ export default function App() {
   const [showBatch, setShowBatch]       = useState(false)
   const [showExports, setShowExports]   = useState(false)
   const [showFlash, setShowFlash]       = useState(false)
+  const [showSummary, setShowSummary]   = useState(false)
   const [exportFormat, setExportFormat] = useState<'png' | 'pdf' | 'both'>('both')
   const [mobileTab, setMobileTab]       = useState<MobileTab>('preview')
   const [saveStatus, setSaveStatus]     = useState<'saved' | 'unsaved' | 'saving'>('saved')
@@ -349,6 +351,13 @@ export default function App() {
           </button>
         ))}
       </div>
+      {/* The whole carousel on one card. Sits with the export controls because
+          that is what it produces — an artifact, not an edit. */}
+      <button onClick={() => setShowSummary(true)}
+        title="Every slide's takeaway on one card"
+        className="rounded-lg border-[1.5px] border-border bg-card px-2.5 py-[3px] text-[10px] font-bold uppercase tracking-[0.05em] text-muted-foreground transition-all hover:border-brand hover:text-brand">
+        Summary
+      </button>
       <div className="flex-1" />
       <span className="text-[11px] text-muted-foreground">
         Slide {previewIndex + 1} of {config.slides.length}
@@ -561,6 +570,13 @@ export default function App() {
       {/* Below 1200px the editor row isn't rendered, so there is no column to
           dock into and Exports falls back to covering the screen. */}
       {showExports && isMobile && <ExportsGallery onClose={() => setShowExports(false)} />}
+      {showSummary && (
+        <SummarySlideModal
+          carouselId={carouselId}
+          slides={config.slides}
+          onClose={() => setShowSummary(false)}
+        />
+      )}
       {showFlash && activeSlide && (
         <FlashVideoModal
           slide={activeSlide}

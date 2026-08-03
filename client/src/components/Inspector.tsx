@@ -3,6 +3,7 @@ import { Slide, CarouselCaptions, CarouselConfig } from '../types'
 import SlideEditor from './SlideEditor'
 import CaptionEditor from './CaptionEditor'
 import BgImageCard, { BgImageCardProps } from './BgImageCard'
+import SlideVideoCard from './SlideVideoCard'
 import { Finding, sortFindings } from '../hooks/useSlideCheck'
 import { cn } from '../lib/utils'
 
@@ -100,7 +101,12 @@ export default function Inspector({
 
       <div className="min-h-0 flex-1 overflow-hidden">
         {tab === 'image' ? (
-          <BgImageCard slide={slide} allSlides={allSlides} {...bg} />
+          // The slide-video control lives here because it needs a background to
+          // composite over, and this is where backgrounds are set.
+          <div className="h-full overflow-y-auto">
+            <BgImageCard slide={slide} allSlides={allSlides} {...bg} />
+            <SlideVideoCard slide={slide} slideNumber={slide.slideNumber ?? 1} carouselSlug={slug} />
+          </div>
         ) : tab === 'caption' ? (
           <CaptionEditor
             captions={captions} onChange={onCaptionsChange}
