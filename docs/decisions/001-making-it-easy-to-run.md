@@ -45,11 +45,22 @@ Publishing to npm turns four commands into `bunx social-studio` — no git, no
 clone, no directory, and updates become `@latest` rather than `git pull` into a
 tree the user has edited.
 
-**Blocker first:** the app writes `carousels/`, `exports/`, `output/` and
-`settings.json` under `APP_ROOT`. Installed globally that is inside
-`node_modules` — wrong, and wiped on reinstall. Needs a code root / data root
-split, with data defaulting to `~/.social-studio/`. `lib/paths.ts` already
-centralises every path, so this is contained rather than a hunt.
+**Blocker cleared.** The app used to write `carousels/`, `exports/`, `output/`
+and `settings.json` under `APP_ROOT` — inside `node_modules` once installed, and
+wiped on reinstall. `lib/roots.ts` now splits them: code (fonts, examples,
+frameworks, themes, Python scripts, built client) stays on `APP_ROOT`; work
+(carousels, exports, images, audio, settings) hangs off `DATA_ROOT`.
+
+`DATA_ROOT` is the clone itself unless the app is running from under
+`node_modules`, in which case it is `~/.social-studio`. Detected rather than
+guessed, so an existing checkout keeps everything exactly where it was —
+relocating someone's carousels would be a worse bug than the one this fixes.
+`SOCIAL_STUDIO_DATA` overrides either way.
+
+`fonts/` needed the same treatment for a subtler reason: it holds both the two
+vendored faces and any typeface you drop in. Installed, a font of yours in
+`node_modules/social-studio/fonts` would vanish on upgrade. Both directories are
+searched, yours first.
 
 ### Bundling Python is the cheapest real fix
 

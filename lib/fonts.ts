@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from 'fs'
 import { basename, extname, isAbsolute, join } from 'path'
 
-import { APP_ROOT, expandPath } from './paths'
+import { APP_ROOT, DATA_ROOT, expandPath } from './paths'
 import { readSettings } from './settings'
 
 /**
@@ -14,7 +14,29 @@ import { readSettings } from './settings'
  * preview is a preview.
  */
 
+/** Shipped with the app: Inter and JetBrains Mono. Replaced on every upgrade. */
 export const FONTS_DIR = join(APP_ROOT, 'fonts')
+
+/** Yours. Only distinct from the above when the app is installed rather than
+ *  cloned — but then it matters, because a typeface you dropped into
+ *  node_modules would be gone on the next upgrade. Searched first, so your file
+ *  wins over a shipped one of the same name. */
+export const USER_FONTS_DIR = join(DATA_ROOT, 'fonts')
+
+/** Both, nearest first. The same directory twice when running from a clone,
+ *  which is why it is deduped. */
+function fontDirs(): string[] {
+  return [...new Set([USER_FONTS_DIR, FONTS_DIR])]
+}
+
+/** Where a bare font filename actually resolves. */
+export function findFontFile(name: string): string | null {
+  for (const dir of fontDirs()) {
+    const p = join(dir, name)
+    if (existsSync(p)) return p
+  }
+  return null
+}
 
 const FONT_EXT = new Set(['.ttf', '.otf', '.ttc', '.woff2'])
 
@@ -36,8 +58,8 @@ function resolve(configured: string): FontChoice {
   if (!name) return { configured: '', path: '', url: '' }
   const abs = isAbsolute(name) || name.startsWith('~')
     ? expandPath(name)
-    : join(FONTS_DIR, name)
-  if (!existsSync(abs)) return { configured: name, path: '', url: '' }
+    : findFontFile(name) ?? ''
+  if (!abs || !existsSync(abs)) return { configured: name, path: '', url: '' }
   return { configured: name, path: abs, url: `/fonts/${encodeURIComponent(basename(abs))}` }
 }
 
@@ -58,10 +80,10 @@ export function fontPayload(): { fontPath?: string; monoFontPath?: string } {
 /** Everything in fonts/, for the picker. The two vendored faces are marked so
  *  the UI can say which are yours. */
 export function listFonts() {
-  let files: string[] = []
-  try {
-    files = readdirSync(FONTS_DIR).filter((f) => FONT_EXT.has(extname(f).toLowerCase()))
-  } catch { /* no fonts dir — the renderer has its own fallbacks */ }
+  const files = [...new Set(fontDirs().flatMap((dir) => {
+    try { return readdirSync(dir).filter((f) => FONT_EXT.has(extname(f).toLowerCase())) }
+    catch { return [] }          // missing dir is fine; the renderer has fallbacks
+  }))]
 
   const body = bodyFont(), mono = monoFont()
   return files.sort().map((file) => ({

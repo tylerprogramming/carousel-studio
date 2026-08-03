@@ -10,8 +10,9 @@ import {
 } from './lib/paths'
 import { creatorHandle, loadEnv, readSettings, writeSettings } from './lib/settings'
 import { MIME, mediaType, pngSize, slugFromTitle } from './lib/media'
-import { FONTS_DIR, fontPayload, listFonts } from './lib/fonts'
+import { findFontFile, fontPayload, listFonts } from './lib/fonts'
 import { seedExamples } from './lib/examples'
+import { DATA_IS_SEPARATE, DATA_ROOT } from './lib/roots'
 import {
   hasFfmpeg, python, pythonBin, pythonCandidates, reportPython,
 } from './lib/python'
@@ -71,8 +72,8 @@ app.get('/api/fonts', (c) => c.json(listFonts()))
 app.get('/fonts/:name', async (c) => {
   const name = c.req.param('name')
   if (name.includes('/') || name.includes('..')) return c.text('Not found', 404)
-  const path = join(FONTS_DIR, name)
-  if (!existsSync(path)) return c.text('Not found', 404)
+  const path = findFontFile(name)
+  if (!path) return c.text('Not found', 404)
   return new Response(Bun.file(path), {
     headers: {
       'Content-Type': mediaType(name) === 'application/octet-stream'
@@ -694,6 +695,7 @@ app.get('*', async (c) => {
 if (import.meta.main) {
   console.log('🎨 Social Studio running on http://localhost:3010')
   reportPython()
+  if (DATA_IS_SEPARATE) console.log(`   your work is in ${DATA_ROOT}`)
   if (seeded.length) {
     console.log(`   added ${seeded.length} example carousel${seeded.length > 1 ? 's' : ''} to get you started`)
   }

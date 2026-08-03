@@ -1,11 +1,12 @@
 import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
+import { APP_ROOT, DATA_ROOT } from './roots'
 
-// Deliberately not from ./paths: paths.ts imports readSettings for exportDir()
-// and friends, so importing SETTINGS_FILE back from it would be a cycle. This
-// is the one path this module needs and it is the same join.
-const SETTINGS_FILE = join(import.meta.dir, '..', 'settings.json')
+// From ./roots rather than ./paths: paths.ts imports readSettings for
+// exportDir() and friends, so reaching back into it would be a cycle. roots.ts
+// imports nothing, which is why it exists.
+const SETTINGS_FILE = join(DATA_ROOT, 'settings.json')
 
 /**
  * settings.json, cached.
@@ -46,7 +47,7 @@ export function creatorHandle(): string {
  * keys. Real environment variables always win over both.
  */
 export function loadEnv() {
-  for (const envPath of [join(import.meta.dir, '..', '.env'), join(homedir(), '.claude', '.env')]) {
+  for (const envPath of [join(DATA_ROOT, '.env'), join(APP_ROOT, '.env'), join(homedir(), '.claude', '.env')]) {
     try {
       for (const line of readFileSync(envPath, 'utf8').split('\n')) {
         const t = line.trim()
