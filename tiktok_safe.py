@@ -24,7 +24,7 @@ Payload:
   input    : path to the 1080x1350 slide PNG        (required)
   output   : where to write the 1080x1920 PNG       (required)
   bgColor  : "#RRGGBB" pad colour, default #12141A
-  margin   : side margin in px, default 110
+  margin   : side margin in px, default 0 (the slide fills the width)
   topBias  : how far up the content sits, 0-1, default 0.38
   format   : "png" or "jpg", default png
 
@@ -71,7 +71,15 @@ def write_out(canvas, cfg):
 def reframe(cfg):
     src = Image.open(cfg['input']).convert('RGB')
     bg = hex_to_rgb(cfg.get('bgColor'))
-    margin = int(cfg.get('margin', 110))
+    # 0 by default: a 4:5 slide fills the frame's width, the way a photo does
+    # in an Instagram feed. It used to inset by 110px each side to keep the
+    # slide clear of TikTok's action rail, which cost 20% of the width and left
+    # the slide floating in a field of its own background colour.
+    #
+    # The trade is deliberate: the rail now overlaps the slide's right edge, as
+    # it overlaps anything else posted full-width. The slide's own 84px padding
+    # absorbs most of that. Pass a margin explicitly to get the old inset back.
+    margin = int(cfg.get('margin', 0))
     top_bias = float(cfg.get('topBias', 0.38))
 
     # A slide already drawn at 1080x1920 — the `tall` variant — is native 9:16

@@ -56,6 +56,7 @@ const TT_TOP_BIAS = TIKTOK_SAFE.topBias
 function useFitToColumn(column: React.RefObject<HTMLDivElement | null>) {
   const body = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
+  const [natural, setNatural] = useState(0)
 
   useLayoutEffect(() => {
     const fit = () => {
@@ -70,6 +71,7 @@ function useFitToColumn(column: React.RefObject<HTMLDivElement | null>) {
       const pad = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
       const available = col.clientHeight - others - pad
       const natural = el.offsetHeight
+      setNatural(natural)
       // Never scale up — a large monitor should not inflate a phone mockup
       // past the size a phone is.
       setScale(available > 0 && natural > 0 ? Math.min(1, available / natural) : 1)
@@ -86,7 +88,7 @@ function useFitToColumn(column: React.RefObject<HTMLDivElement | null>) {
     return () => { ro.disconnect(); window.removeEventListener('resize', fit) }
   })
 
-  return { body, scale }
+  return { body, scale, natural }
 }
 
 // ── Shared phone shell ────────────────────────────────────────────────────────
@@ -505,7 +507,7 @@ export default function PlatformPreview({
   // is easy to get wrong and impossible to see.
   const [showSafeArea, setShowSafeArea] = useState(true)
   const column = useRef<HTMLDivElement>(null)
-  const { body: phone, scale } = useFitToColumn(column)
+  const { body: phone, scale, natural } = useFitToColumn(column)
 
   if (!slides[activeIndex]) return null
 
@@ -578,6 +580,11 @@ export default function PlatformPreview({
       <div ref={phone} style={{
         position: 'relative', flexShrink: 0,
         transform: `scale(${scale})`, transformOrigin: 'top center',
+        // A transform does not change layout, so this box still occupies its
+        // full height and everything after it sits lower than the phone
+        // visually ends — which pushed the note below the fold. Pull back the
+        // difference between the laid-out height and the drawn one.
+        marginBottom: -(natural * (1 - scale)),
       }}>
         {playingUrl ? (
           <ExportPlayer url={playingUrl} />

@@ -62,8 +62,11 @@ export const ASPECT = CANVAS.height / CANVAS.width
  * preview stops matching the exported set.
  */
 export const TIKTOK_SAFE = {
-  /** Side margin as a fraction of frame width (110 / 1080) */
-  margin: 110 / 1080,
+  /** Side margin as a fraction of frame width. 0: a 4:5 slide fills the width
+   *  the way a feed photo does. Mirrors the default in tiktok_safe.py — these
+   *  two are the preview and the export of the same framing, so they move
+   *  together or the preview stops being a preview. */
+  margin: 0,
   /** <0.5 pushes content up, away from the caption */
   topBias: 0.38,
 } as const
