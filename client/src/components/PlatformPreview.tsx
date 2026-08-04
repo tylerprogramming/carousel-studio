@@ -596,6 +596,24 @@ export default function PlatformPreview({
       <div style={{ marginTop: 12, fontSize: 12, color: '#a1a1aa', fontWeight: 600 }}>
         {playingUrl ? playingUrl.split('/').pop() : `${activeIndex + 1} of ${slides.length}`}
       </div>
+
+      {/* The bands above and below a 4:5 slide on TikTok are arithmetic, not a
+          setting: 1080x1350 inside 1080x1920 leaves 44% of the frame over, and
+          the export fills it with the slide's own background exactly as shown.
+          Without saying so this reads as the preview being broken — which is
+          what it looked like. The fix is a different slide, so name it. */}
+      {platform === 'tiktok' && !playingUrl
+        && slides[activeIndex] && slides[activeIndex].variant !== 'tall' && (
+        <div style={{
+          marginTop: 8, maxWidth: 300, textAlign: 'center',
+          fontSize: 11, lineHeight: 1.45, color: '#71717a',
+        }}>
+          This slide is 4:5, so TikTok leaves a band above and below it. That is
+          what the export looks like too. The{' '}
+          <strong style={{ color: '#52525b' }}>Terminal Tall</strong> theme draws
+          at 9:16 and fills the frame.
+        </div>
+      )}
     </div>
   )
 }
