@@ -1,5 +1,52 @@
 # Changelog
 
+## 2.5.0
+
+**A 4:5 slide fills the width on TikTok.** The reframe used to inset every slide
+by 110px a side to keep it clear of TikTok's action rail. That cost a fifth of
+the width and left the slide floating in a field of its own background colour.
+
+Measured against a real posted carousel: the slide occupied **79.6% of the
+screen width, and every one of those margins was ours** — TikTok displayed the
+export at full width and added nothing. The renderer and the posted screenshot
+agreed to the decimal, so this is not a theory about what TikTok does.
+
+Now it covers 100% of the width and 70.3% of the frame, against 44.6% before —
+type about 26% larger on screen. The bands above and below remain, because
+1080x1350 inside 1080x1920 is arithmetic, but the slide clears TikTok's
+pagination dots by 64px.
+
+The trade is deliberate: the action rail now overlaps the rightmost 144px of the
+slide, so the `swipe →` marker sits under TikTok's share and sound icons. The
+dots already say it is a carousel, so little is lost. Pass `margin` explicitly
+to `tiktok_safe.py` for the old inset.
+
+**Upgrading:** this changes what you export. Slides posted before this have the
+inset; slides exported after fill the width. If a running series needs to look
+consistent, `margin: 110` reproduces the old framing.
+
+**The phone preview fits the panel it is in.** Every dimension derived from one
+constant, so the mockup was 908px tall whatever the window was — on a laptop a
+third of it fell outside the panel, and could not be scrolled to either: the
+preview column was a block child, so its `flex: 1` did nothing, its height
+resolved to its content, and `clientHeight` equalled `scrollHeight`. No
+scrollbar was ever produced. The column is bounded now and the phone scales to
+what is left, never above 1:1.
+
+The scale is applied to the wrapper holding the phone *and* the arrow buttons,
+which are positioned against that box — scaling the phone alone would have left
+them beside a phone that had moved.
+
+**A note under the TikTok preview** says why a 4:5 slide leaves bands, that the
+export looks the same, and that the Terminal Tall theme draws at 9:16 and fills
+the frame. The slide and the band are the same colour because they are the same
+fill, so the framing was correct and unreadable at once.
+
+Fixed along the way: a CSS transform does not affect layout, so the scaled phone
+still occupied its full unscaled height and everything after it sat lower than
+the phone visually ended — far enough to push that note off the bottom of the
+screen.
+
 ## 2.4.0
 
 **Four features that already worked can now be reached.** Each of these shipped
