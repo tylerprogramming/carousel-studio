@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Slide } from '../types'
 import SlidePreview, { slideAspect, TALL_SAFE } from './SlidePreview'
 import { useSettings } from '../hooks/useSettings'
@@ -36,6 +36,58 @@ const PHONE_W     = 390
 const TT_VIDEO_H  = Math.round(PHONE_W * 16 / 9)
 const TT_MARGIN   = TIKTOK_SAFE.margin
 const TT_TOP_BIAS = TIKTOK_SAFE.topBias
+
+/**
+ * Shrink the mockup until it fits the column it sits in.
+ *
+ * Every dimension here derives from PHONE_W, a constant, so the phone was the
+ * same size whatever the window was — 908px tall in a 631px column on a laptop,
+ * with a third of it below the fold.
+ *
+ * A transform rather than smaller numbers: the phone is a faithful mockup and
+ * its proportions are the point, so scaling the whole thing keeps them where
+ * re-deriving a dozen constants from the available height would not.
+ *
+ * `column` is the scrolling container, not the immediate parent. The immediate
+ * parent is sized *by the phone*, so measuring it compares the phone to itself
+ * and always scales by 1. Transforms do not affect layout, so the measured
+ * height stays the natural one and this cannot oscillate.
+ */
+function useFitToColumn(column: React.RefObject<HTMLDivElement | null>) {
+  const body = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
+
+  useLayoutEffect(() => {
+    const fit = () => {
+      const col = column.current
+      const el  = body.current
+      if (!col || !el) return
+      // Everything in the column that is not the phone: the label above and the
+      // slide counter below, plus the column's own padding.
+      const others = [...col.children].reduce(
+        (n, child) => n + (child === el ? 0 : (child as HTMLElement).offsetHeight), 0)
+      const style = getComputedStyle(col)
+      const pad = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
+      const available = col.clientHeight - others - pad
+      const natural = el.offsetHeight
+      // Never scale up — a large monitor should not inflate a phone mockup
+      // past the size a phone is.
+      setScale(available > 0 && natural > 0 ? Math.min(1, available / natural) : 1)
+    }
+    fit()
+    // Both, deliberately. The observer catches the panel changing without the
+    // window doing so — opening Exports, or the Inspector taking its slot. The
+    // window listener catches the plain case and does not depend on
+    // ResizeObserver, which is the harder of the two to verify.
+    const ro = new ResizeObserver(fit)
+    if (column.current) ro.observe(column.current)
+    if (body.current) ro.observe(body.current)
+    window.addEventListener('resize', fit)
+    return () => { ro.disconnect(); window.removeEventListener('resize', fit) }
+  })
+
+  return { body, scale }
+}
 
 // ── Shared phone shell ────────────────────────────────────────────────────────
 function PhoneShell({ children, bg = '#fff' }: { children: React.ReactNode; bg?: string }) {
@@ -452,6 +504,8 @@ export default function PlatformPreview({
   // On by default: the inset is the single thing about the TikTok framing that
   // is easy to get wrong and impossible to see.
   const [showSafeArea, setShowSafeArea] = useState(true)
+  const column = useRef<HTMLDivElement>(null)
+  const { body: phone, scale } = useFitToColumn(column)
 
   if (!slides[activeIndex]) return null
 
@@ -481,8 +535,14 @@ export default function PlatformPreview({
   )
 
   return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+    <div ref={column} style={{
+      // height 100%, not flex:1. The parent is a plain block, so flex:1 did
+      // nothing and this box sized to its content — taller than the panel it
+      // sits in. overflowY had nothing to scroll and the bottom of the phone
+      // was clipped away with no way to reach it. minHeight 0 as well, so it
+      // still shrinks correctly if this ever becomes a flex child.
+      height: '100%', minHeight: 0,
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'flex-start', overflowY: 'auto', padding: '20px 0',
       background: bgColor,
     }}>
@@ -511,8 +571,14 @@ export default function PlatformPreview({
         ) : null}
       </div>
 
-      {/* Phone wrapped in relative div so arrows can overlay the sides */}
-      <div style={{ position: 'relative', flexShrink: 0 }}>
+      {/* Phone wrapped in relative div so arrows can overlay the sides.
+          The scale goes here rather than on the phone itself: the arrows are
+          positioned against this box, so scaling inside it would leave them
+          floating beside a phone that had moved. */}
+      <div ref={phone} style={{
+        position: 'relative', flexShrink: 0,
+        transform: `scale(${scale})`, transformOrigin: 'top center',
+      }}>
         {playingUrl ? (
           <ExportPlayer url={playingUrl} />
         ) : (
