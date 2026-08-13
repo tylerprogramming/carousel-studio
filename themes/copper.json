@@ -1,9 +1,14 @@
 {
   "id": "copper",
   "name": "Copper",
-  "description": "Cream with a copper accent, sampled from @theromanknox. Recorded as the control case: it lost badly to Electric on identical content, likely on contrast. Check it at thumbnail size before using it.",
-  "bgColor": "#FCFCFC",
+  "description": "Warm near-white with a copper gradient. Sampled from @theromanknox across five slides. The accent is a GRADIENT (#B47850 to #D28C5A), not a flat colour - accentColor holds the midpoint for renderers that only take one. See references/copper/ for the layout, which is worth more than the palette.",
+  "bgColor": "#FAFAFA",
   "textColor": "#0A0A0A",
-  "accentColor": "#CC8454",
+  "accentColor": "#C38255",
+  "accentGradient": [
+    "#B47850",
+    "#D28C5A"
+  ],
+  "tintColor": "#F5DCC8",
   "order": 9
 }

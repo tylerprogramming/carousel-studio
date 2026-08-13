@@ -11,7 +11,9 @@ Full analysis and the performance data: `~/content/BRAIN/instagram/carousel-styl
 ```
 electric/   @ibraviz.ai        01-cover, 02-what-this-is, 04-table-slide
 pixel/      @albert.olgaard    01-numbered-cover, 03-mono-card, 08-cta-slide
-copper/     @theromanknox      control-case
+copper/     @theromanknox      02-what-this-is, 03-why-it-works,
+                               04-parts-gradient-table, 05-step-chips,
+                               06-numbered-cards  + STRUCTURE.md
 ```
 
 ---
@@ -78,9 +80,22 @@ What we did not have is the treatment below. Swapping the hex achieves nothing.
 7. **Last slide is pure CTA:** the comment keyword, huge, plus a disarming line
    (*"100% free of course :)"*).
 
-## Copper — `copper.json`, the control case
+## Copper — `copper.json`
 
-`#FCFCFC` ground · `#0A0A0A` ink · `#CC8454` accent
+Five slides, and a **full layout breakdown in
+[copper/STRUCTURE.md](copper/STRUCTURE.md)**. Read that rather than this
+section if you are building something: it separates the palette from the
+layout vocabulary, because the vocabulary is the valuable half and it is
+palette-independent.
+
+Eight elements electric does not have: gradient panels, label chips, pinned
+cards with a red pushpin, hand-drawn circled markers, ghosted step watermarks,
+2x2 numbered tint cards, semantically coloured status tiles, and a gradient
+bottom bar.
+
+The palette is the part to be careful with, and it is measured:
+
+`#FAFAFA` ground · `#0A0A0A` ink · `#B47850` → `#D28C5A` **gradient** accent
 
 Kept because it is evidence, not because it is good. @theromanknox ran
 substantially the same carousel as @ibraviz.ai days apart - same slide order,
@@ -110,7 +125,8 @@ def ratio(a, b):
 ```
 
 Aim for 4.5:1 or better on `ratio(accentColor, bgColor)`. Current themes:
-electric 5.7, pixel 3.4, copper 2.9.
+electric 5.5, pixel 3.4, copper 3.0 - and copper's real number is worse than
+that, because it prints white on the dark end of its gradient: **3.7:1**.
 
 ---
 
