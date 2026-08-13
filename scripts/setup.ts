@@ -80,9 +80,15 @@ ok(`Bun ${Bun.version}`)
 
 // ── Python ────────────────────────────────────────────────────────────────────
 // The same search order the app uses at runtime, so setup and the running app
-// can never disagree about which interpreter is in play.
+// can never disagree about which interpreter is in play. The project venv comes
+// first because that is where we install Pillow — see the uv block below.
+const VENV_PY = platform() === 'win32'
+  ? join(ROOT, '.venv', 'Scripts', 'python.exe')
+  : join(ROOT, '.venv', 'bin', 'python3')
+
 const CANDIDATES = [
   process.env.CAROUSEL_PYTHON,
+  VENV_PY,
   'python3', '/usr/bin/python3', '/opt/homebrew/bin/python3', '/usr/local/bin/python3', 'python',
 ].filter(Boolean) as string[]
 
@@ -134,27 +140,61 @@ for (const [label, cwd] of [['server', ROOT], ['client', join(ROOT, 'client')]] 
 
 // Pillow *is* this app's dependency, so installing it is fair game — unlike the
 // interpreter it runs on.
-if (python.pillow) {
-  ok(`Pillow ${python.pillow}`)
+//
+// Preferred path is uv into a project-local .venv. That is not fashion: pip into
+// a Homebrew or system Python hits PEP 668 ("externally managed"), and the only
+// way through is --break-system-packages, which does exactly what it says on a
+// Python the OS depends on. A project venv sidesteps the whole question, and
+// pins the FreeType the golden tests were recorded against instead of inheriting
+// whatever the machine happens to have.
+const hasUv = run(['uv', '--version']).code === 0
+
+if (python.pillow && python.bin === VENV_PY) {
+  ok(`Pillow ${python.pillow} ${c.dim('(.venv)')}`)
+} else if (hasUv) {
+  console.log(`  ${c.dim('…')} creating .venv and installing Pillow with uv`)
+  let r = run(['uv', 'venv', join(ROOT, '.venv')])
+  if (r.code === 0) {
+    r = run(['uv', 'pip', 'install', '--python', VENV_PY, '-r', join(ROOT, 'requirements.txt')])
+  }
+  const after = r.code === 0 ? probe(VENV_PY) : null
+  if (after?.pillow) {
+    ok(`Pillow ${after.pillow} ${c.dim('(.venv, via uv)')}`)
+    python = after
+  } else {
+    bad('uv could not build the environment.')
+    hint(r.err.split('\n').filter(Boolean).slice(-2).join(' ') || 'no error output')
+    hint('Try it by hand, then run this again:')
+    cmd(`uv venv && uv pip install -r requirements.txt`)
+    process.exit(1)
+  }
+} else if (python.pillow) {
+  ok(`Pillow ${python.pillow} ${c.dim(`(${python.bin})`)}`)
+  hint('Tip: uv would put this in a project .venv instead of a shared Python.')
+  cmd('curl -LsSf https://astral.sh/uv/install.sh | sh')
 } else {
-  console.log(`  ${c.dim('…')} installing Pillow`)
+  warn('uv not found, falling back to pip. uv is one command and avoids the')
+  warn('"externally managed environment" problem entirely:')
+  cmd('curl -LsSf https://astral.sh/uv/install.sh | sh')
+  console.log(`  ${c.dim('…')} installing Pillow with pip`)
   let r = run([python.bin, '-m', 'pip', 'install', '-r', join(ROOT, 'requirements.txt')])
-  // Homebrew and system Pythons mark themselves externally managed (PEP 668).
-  // The flag sounds alarming and is not, on a Python that is not the OS's own —
-  // but it is only reached after the plain attempt has already failed.
   if (r.code !== 0 && /externally.managed/i.test(r.err)) {
-    warn('This Python is externally managed; retrying with --break-system-packages')
-    r = run([python.bin, '-m', 'pip', 'install', '--break-system-packages',
-             '-r', join(ROOT, 'requirements.txt')])
+    // Deliberately NOT retrying with --break-system-packages. On a Homebrew or
+    // system Python that can break tooling the OS relies on, and it is never
+    // necessary now that uv exists. Direct instead.
+    bad('This Python is externally managed (PEP 668), so pip will not install into it.')
+    hint('Install uv and run setup again — this is exactly what it solves:')
+    cmd('curl -LsSf https://astral.sh/uv/install.sh | sh')
+    hint('Or make a virtualenv yourself:')
+    cmd(`${python.bin} -m venv .venv && .venv/bin/pip install -r requirements.txt`)
+    process.exit(1)
   }
   const after = probe(python.bin)
   if (after?.pillow) { ok(`Pillow ${after.pillow}`); python = after }
   else {
     bad('Could not install Pillow automatically.')
-    hint('Install it yourself, then run this again:')
-    cmd(`${python.bin} -m pip install -r requirements.txt`)
-    hint('If that reports "externally managed", either add --break-system-packages')
-    hint('or use a virtualenv and point the app at it with pythonPath in settings.json.')
+    hint('Install uv and run setup again:')
+    cmd('curl -LsSf https://astral.sh/uv/install.sh | sh')
     process.exit(1)
   }
 }

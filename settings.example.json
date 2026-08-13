@@ -1,13 +1,27 @@
 {
-  "_comment": "Copy to settings.json and edit. Every field is optional.",
+  "_comment": "Copied to settings.json by `bun run setup`. Every field is optional and blank means 'use the default'. Field docs are in _help below; delete that key if it bothers you, nothing reads it.",
+
   "handle": "@yourhandle",
-  "brandVoice": "Optional. A sentence or two describing how your captions should sound, e.g. 'Blunt and practical. No hype. Short sentences.' Appended to the caption system prompt.",
-  "exportDir": "Optional. Where exported carousels are written. Defaults to ./exports. Supports ~ for your home directory.",
-  "likenessPath": "Optional. Absolute path to a photo of you, used as a reference image when 'Use my likeness' is checked.",
-  "likenessDescription": "Optional. Appended to the image prompt so the model gets your appearance right, e.g. 'The person in the image is a young adult male. Always generate a male person, not female.'",
-  "communityUrl": "Optional. Community or link-in-bio URL shown on flash-video footers, e.g. 'skool.com/your-community'. Left blank, the line is omitted.",
-  "audioPath": "Optional. Default audio bed for generated videos, e.g. 'audio/my-bed.mp3'. Relative to the app, or absolute. Supports ~.",
-  "pythonPath": "Optional. The interpreter that renders slides, e.g. '/usr/bin/python3'. Left blank, the first one that can import Pillow is used. Set it when you have several Pythons and want a specific one \u2014 different builds ship different FreeType versions, which changes exported pixels.",
-  "fontPath": "Optional. Body typeface. A filename in fonts/, e.g. 'MyBrand-Variable.ttf', or an absolute path. Left blank, the vendored Inter is used. The browser is served the same file, so the preview matches the export.",
-  "monoFontPath": "Optional. Monospace typeface for the terminal variant. Same rules as fontPath. Left blank, the search is Menlo, Monaco, then the vendored JetBrains Mono."
+  "brandVoice": "",
+  "exportDir": "",
+  "likenessPath": "",
+  "likenessDescription": "",
+  "communityUrl": "",
+  "audioPath": "",
+  "pythonPath": "",
+  "fontPath": "",
+  "monoFontPath": "",
+
+  "_help": {
+    "handle": "Creator handle shown on CTA slides and in the platform preview mockups.",
+    "brandVoice": "A sentence or two describing how your captions should sound, e.g. 'Blunt and practical. No hype. Short sentences.' Appended to the caption system prompt.",
+    "exportDir": "Where exported carousels are written. Defaults to ./exports. Supports ~ for your home directory.",
+    "likenessPath": "Absolute path to a photo of you, used as a reference image when 'Use my likeness' is checked.",
+    "likenessDescription": "Appended to the image prompt so the model gets your appearance right, e.g. 'The person in the image is a young adult male. Always generate a male person, not female.'",
+    "communityUrl": "Community or link-in-bio URL shown on flash-video footers, e.g. 'skool.com/your-community'. Left blank, the line is omitted.",
+    "audioPath": "Default audio bed for generated videos, e.g. 'audio/my-bed.mp3'. Relative to the app, or absolute. Supports ~.",
+    "pythonPath": "The interpreter that renders slides. Leave it blank: setup builds a project .venv with uv and the app finds it automatically. Set it only if you have a specific interpreter you must use, and know that different builds ship different FreeType versions, which changes exported pixels.",
+    "fontPath": "Body typeface. A filename in fonts/, e.g. 'MyBrand-Variable.ttf', or an absolute path. Left blank, the vendored Inter is used. The browser is served the same file, so the preview matches the export.",
+    "monoFontPath": "Monospace typeface for the terminal variant. Same rules as fontPath. Left blank, the search is Menlo, Monaco, then the vendored JetBrains Mono."
+  }
 }

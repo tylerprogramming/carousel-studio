@@ -34,3 +34,6 @@ tests/fixtures/golden/_failed/
 
 # Bun
 bun.lockb
+
+# Project Python environment, created by `bun run setup`
+.venv/

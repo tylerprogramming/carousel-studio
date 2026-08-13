@@ -1,4 +1,6 @@
+import { join } from 'path'
 import { expandPath } from './paths'
+import { APP_ROOT } from './roots'
 import { onSettingsChange, readSettings } from './settings'
 
 /**
@@ -55,6 +57,13 @@ export function pythonCandidates(): string[] {
   return [...new Set([
     process.env.CAROUSEL_PYTHON,
     configured && expandPath(configured),
+    // The project venv, which `bun run setup` creates with uv. Ahead of every
+    // system interpreter on purpose: it is the one setup actually installed
+    // Pillow into, and it pins the FreeType that the golden tests were recorded
+    // against. A system python3 that happens to have some other Pillow would
+    // otherwise win and quietly change exported pixels.
+    join(APP_ROOT, '.venv', 'bin', 'python3'),
+    join(APP_ROOT, '.venv', 'Scripts', 'python.exe'),   // Windows layout
     'python3',
     '/usr/bin/python3',
     '/opt/homebrew/bin/python3',
