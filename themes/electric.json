@@ -1,8 +1,8 @@
 {
   "id": "electric",
   "name": "Electric",
-  "description": "Near-white with an electric blue accent. Product-spec look, sampled from @ibraviz.ai. One accent, used only to mark the thing that matters.",
-  "bgColor": "#FCFCFC",
+  "description": "Near-white with a faint grey cast and an electric blue accent. Product-spec look, sampled from @ibraviz.ai whose ground carries a #F0F0F6 grid tint. One accent, used only to mark the thing that matters.",
+  "bgColor": "#F7F8FA",
   "textColor": "#0A0A0A",
   "accentColor": "#2454F0",
   "order": 2
