@@ -20,7 +20,7 @@ copper/     @theromanknox      02-what-this-is, 03-why-it-works,
 
 ## Electric — `electric.json`
 
-`#FCFCFC` ground · `#0A0A0A` ink · `#2454F0` accent
+`#F7F8FA` ground · `#0A0A0A` ink · `#2454F0` accent
 
 Reads like a spec sheet someone paid for. Use it when the point is that the
 thing is **engineered**.
@@ -106,8 +106,8 @@ Reach explains most of that gap. What reach does not explain is saves-per-like:
 **0.80 against 1.43**.
 
 Measured, not guessed: on the emphasis block, where the ground colour is
-printed on top of the accent, copper gives **2.9:1** contrast. Electric gives
-**5.7:1**. The themes README warns about exactly this failure and it is the one
+printed on top of the accent, copper gives **3.0:1** contrast. Electric gives
+**5.5:1**. The themes README warns about exactly this failure and it is the one
 that is easy to miss, because the headline still looks fine while the emphasis
 line quietly turns to mush at thumbnail size.
 

@@ -41,32 +41,34 @@ suite holds the renderer to, so this picture cannot drift from what you get.
 
 ## Quickstart
 
-**You need** [Bun](https://bun.sh) 1.1+, Python 3.9+, and
-[uv](https://docs.astral.sh/uv/). Everything else `setup` handles or tells you
-how to get.
+**You need** [Bun](https://bun.sh) 1.1+ and Python 3.9+. Everything else `setup`
+handles or tells you how to get.
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh    # if you do not have it
-
 git clone https://github.com/tylerprogramming/social-studio.git
 cd social-studio
 bun run setup             # checks what you have, installs the rest
 bun run dev               # http://localhost:5175
 ```
 
-`setup` builds a project-local `.venv` with uv, installs Pillow into it, writes
-`settings.json` and `.env`, and tells you exactly what to run if something is
-missing. It never installs a language runtime for you and never overwrites
-config you already have.
+`setup` puts Pillow in a project-local `.venv`, writes `settings.json` and
+`.env`, and tells you exactly what to run if something is missing. It never
+installs a language runtime for you and never overwrites config you already have.
 
-**Why uv rather than pip.** Installing Pillow with pip into a Homebrew or system
-Python hits PEP 668 — "externally managed environment" — and the usual way
-through is `--break-system-packages`, which does precisely what it says on a
-Python your OS depends on. A project `.venv` avoids the question entirely, and
-pins the FreeType build that the golden tests were recorded against instead of
-inheriting whatever the machine happens to have. Setup still falls back to pip if
-uv is missing, but it will not reach for `--break-system-packages` on your
-behalf.
+**About uv.** [uv](https://docs.astral.sh/uv/) is not required, but it is the
+smoothest path and setup uses it when it is there. Without it, setup falls back
+to pip — which works on a plain Python, and on a Homebrew or system one hits PEP
+668, "externally managed environment". The usual way through that is
+`--break-system-packages`, which does precisely what it says on a Python your OS
+depends on, so setup stops and points you here instead:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+The `.venv` is worth having for a second reason: it pins the FreeType build the
+golden tests were recorded against, rather than inheriting whatever the machine
+happens to have. Different FreeType builds render text differently.
 
 The app looks for `.venv` before any system interpreter, so there is nothing to
 configure. Leave `pythonPath` blank in `settings.json` unless you have a specific

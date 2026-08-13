@@ -12,6 +12,7 @@ import { creatorHandle, loadEnv, readSettings, writeSettings } from './lib/setti
 import { MIME, mediaType, pngSize, slugFromTitle } from './lib/media'
 import { findFontFile, fontPayload, listFonts } from './lib/fonts'
 import { seedExamples } from './lib/examples'
+import { loadThemes } from './lib/themes'
 import { DATA_IS_SEPARATE, DATA_ROOT } from './lib/roots'
 import {
   hasFfmpeg, python, pythonBin, pythonCandidates, reportPython,
@@ -86,27 +87,9 @@ app.get('/fonts/:name', async (c) => {
 
 // ── Themes ────────────────────────────────────────────────────────────────────
 
-// A theme is one JSON file in themes/. Drop a file in, reload the app, and it
-// shows up — no rebuild, no code change. See themes/README.md for the fields.
-app.get('/api/themes', (c) => {
-  try {
-    const themes = readdirSync(THEMES_DIR)
-      .filter((f) => f.endsWith('.json'))
-      .map((f) => {
-        try {
-          const t = JSON.parse(readFileSync(join(THEMES_DIR, f), 'utf8'))
-          if (!t.bgColor || !t.textColor || !t.accentColor) return null
-          return { ...t, id: t.id || f.replace(/\.json$/, ''), builtin: true }
-        } catch { return null }   // one malformed file must not hide the rest
-      })
-      .filter(Boolean)
-      // Explicit `order` keeps the swatch row stable; readdir order is not.
-      .sort((a: any, b: any) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name))
-    return c.json(themes)
-  } catch {
-    return c.json([])
-  }
-})
+// One JSON file per theme, read fresh each request so a new file needs only a
+// reload. The reading and the skipping rules live in lib/themes.ts.
+app.get('/api/themes', (c) => c.json(loadThemes(THEMES_DIR)))
 
 // ── Carousel Save / Load ──────────────────────────────────────────────────────
 
