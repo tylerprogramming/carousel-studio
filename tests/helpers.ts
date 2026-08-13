@@ -39,6 +39,16 @@ export function python(): string {
   const candidates = [...new Set([
     process.env.CAROUSEL_PYTHON,     // overrides settings, same as the server
     configured,
+    // The project venv, ahead of every system interpreter — the same order
+    // lib/python.ts uses. This list is duplicated rather than imported because
+    // the tests must not depend on the module they are testing, so the two have
+    // to be changed together. They drifted once: .venv was added to the app and
+    // not here, and the moment settings.pythonPath was cleared the suite started
+    // rendering through Homebrew's python3 (Pillow 12.3.0) while the app used
+    // .venv (11.3.0). Every golden "failed" against pixels the app never
+    // produces. If you touch one list, touch this one.
+    join(ROOT, '.venv', 'bin', 'python3'),
+    join(ROOT, '.venv', 'Scripts', 'python.exe'),   // Windows layout
     'python3', '/usr/bin/python3', '/opt/homebrew/bin/python3', '/usr/local/bin/python3', 'python',
   ].filter(Boolean) as string[])]
   for (const bin of candidates) {
