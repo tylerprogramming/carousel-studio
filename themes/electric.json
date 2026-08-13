@@ -1,0 +1,9 @@
+{
+  "id": "electric",
+  "name": "Electric",
+  "description": "Near-white with an electric blue accent. Product-spec look, sampled from @ibraviz.ai. One accent, used only to mark the thing that matters.",
+  "bgColor": "#FCFCFC",
+  "textColor": "#0A0A0A",
+  "accentColor": "#2454F0",
+  "order": 2
+}

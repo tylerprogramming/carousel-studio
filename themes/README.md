@@ -66,6 +66,19 @@ here; the pre-export check measures against whichever canvas the slide uses.
 
 If you are making a colour theme, leave `variant` out.
 
+## Reference carousels
+
+`references/` holds real slides from the feed, cropped to the artboard, with a
+build recipe per style. A theme is three hex values and cannot tell you that the
+body copy is monospace or that the headline breaks two-tone across two lines -
+`references/README.md` is that half. Read it before using `electric` or `pixel`,
+which were both taken from posts rather than invented.
+
+It also carries a contrast check worth running on any new theme: on the emphasis
+block the background is printed on top of the accent, and a pair that looks fine
+in the swatch row can be unreadable at thumbnail size. The `copper` theme is
+kept as the measured example of that going wrong.
+
 ## Saving from the editor
 
 The `+` button in the theme row saves whatever colours the current slide uses.

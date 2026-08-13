@@ -1,0 +1,9 @@
+{
+  "id": "copper",
+  "name": "Copper",
+  "description": "Cream with a copper accent, sampled from @theromanknox. Recorded as the control case: it lost badly to Electric on identical content, likely on contrast. Check it at thumbnail size before using it.",
+  "bgColor": "#FCFCFC",
+  "textColor": "#0A0A0A",
+  "accentColor": "#CC8454",
+  "order": 9
+}

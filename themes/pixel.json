@@ -1,0 +1,9 @@
+{
+  "id": "pixel",
+  "name": "Pixel",
+  "description": "Warm cream with burnt orange. Sampled from @albert.olgaard. Near-identical to Cream by design - the difference in that style is condensed caps and a mono body card, not the palette.",
+  "bgColor": "#F0EAE4",
+  "textColor": "#140A14",
+  "accentColor": "#D85424",
+  "order": 3
+}
